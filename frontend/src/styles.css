@@ -16,3 +16,8 @@
 .passWrap input{width:100%;padding-right:42px}
 .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#8a94a6;cursor:pointer;padding:6px;display:grid;place-items:center}
 .eye:hover{color:#356ae6}
+.chartScroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.chartScroll .chart{min-width:max-content;padding-right:8px}
+.chartTabs{display:flex;gap:4px;background:#eef1f6;border-radius:10px;padding:3px}
+.chartTabs button{border:0;background:transparent;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#7a8597;cursor:pointer;font-family:inherit}
+.chartTabs button.active{background:#fff;color:#172033;box-shadow:0 1px 4px #15233a14}
