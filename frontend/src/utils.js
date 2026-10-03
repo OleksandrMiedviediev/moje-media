@@ -35,10 +35,11 @@ export const toIban = raw => {
   return s;
 };
 
-export const zbpQrPayload = ({ name, iban, amount, note }) => {
+export const zbpQrPayload = ({ name, iban, amount, note, nip }) => {
   const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim();
   const ibanClean = toIban(iban);
   const grosze = Math.round(Number(amount || 0) * 100);
   const reserved = '';
-  return `${reserved}|${ibanClean}|${grosze}|${clean(name)}|${clean(note)}|${reserved}|${reserved}|${reserved}`;
+  // ZBP: NIP получателя в поле 6 (reserved), если задан
+  return `${reserved}|${ibanClean}|${grosze}|${clean(name)}|${clean(note)}|${reserved}|${clean(nip)}|${reserved}`;
 };

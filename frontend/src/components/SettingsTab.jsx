@@ -27,6 +27,7 @@ export function SettingsTab({
         <div className="grid">
           <Field label="Odbiorca (nazwa)" value={settings.payeeName} onChange={v => setSettings({ ...settings, payeeName: v })} />
           <Field label="Numer konta / IBAN" value={settings.payeeIban} onChange={v => setSettings({ ...settings, payeeIban: v.replace(/\s/g, '').toUpperCase() })} />
+          <Field label="NIP odbiorcy (jeśli jest)" value={settings.payeeNip} onChange={v => setSettings({ ...settings, payeeNip: v.replace(/\D/g, '') })} />
           <Field label="Tytuł przelewu (opcjonalnie)" value={settings.paymentNote} onChange={v => setSettings({ ...settings, paymentNote: v })} />
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>

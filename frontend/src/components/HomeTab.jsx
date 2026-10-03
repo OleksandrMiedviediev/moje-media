@@ -8,7 +8,7 @@ function PayQrModal({ settings, total, month, onClose }) {
   const [qr, setQr] = useState('');
   useEffect(() => {
     const note = settings.paymentNote || `Media ${settings.apartment} ${month}`;
-    const payload = zbpQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note });
+    const payload = zbpQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note, nip: settings.payeeNip });
     QRCode.toDataURL(payload, { width: 260, margin: 1 })
       .then(setQr).catch(() => setQr(''));
   }, [settings, total, month]);
