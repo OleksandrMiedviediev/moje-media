@@ -350,49 +350,54 @@ app.post('/api/push/test', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Планировщик: проверка каждый час
-setInterval(async () => {
-  if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const time = now.toTimeString().slice(0, 5);
-  console.log(`[CRON] ${today} ${time} — проверяю уведомления`);
-  try {
-    const settings = await Setting.find({});
-    for (const s of settings) {
-      const apts = s.value?.apartments || [];
-      for (const apt of apts) {
-        const notifs = apt.notifications || [];
-        for (const n of notifs) {
-          if (!n.active || n.time !== time) continue;
-          if (n.lastSent === today) continue;
-          console.log(`[CRON] Проверка ${apt.name} ${n.type} день ${n.day} — сегодня ${now.getDate()}`);
-          let shouldSend = false;
-          let title = `Moje Media — ${apt.name || 'Mieszkanie'}`;
-          let body = '';
-          if (n.type === 'reading' && n.day === now.getDate()) {
-            const month = now.toISOString().slice(0, 7);
-            const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
-            if (!entry) { shouldSend = true; body = 'Nie zapomnij wpisać wskazań wody!'; }
-          }
-          if (n.type === 'payment' && n.day === now.getDate()) {
-            const month = now.toISOString().slice(0, 7);
-            const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
-            if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
-          }
-          if (shouldSend) {
-            console.log(`[CRON] Отправляю push для ${s.userId}`);
-            await sendPush(s.userId, title, body);
-            n.lastSent = today;
+let pushSchedulerStarted = false;
+function startPushScheduler() {
+  if (pushSchedulerStarted) return;
+  pushSchedulerStarted = true;
+  console.log('[CRON] Push scheduler started');
+  setInterval(async () => {
+    if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const time = now.toTimeString().slice(0, 5);
+    console.log(`[CRON] ${today} ${time} — проверяю уведомления`);
+    try {
+      const settings = await Setting.find({});
+      for (const s of settings) {
+        const apts = s.value?.apartments || [];
+        for (const apt of apts) {
+          const notifs = apt.notifications || [];
+          for (const n of notifs) {
+            if (!n.active || n.time !== time) continue;
+            if (n.lastSent === today) continue;
+            console.log(`[CRON] Проверка ${apt.name} ${n.type} день ${n.day} — сегодня ${now.getDate()}`);
+            let shouldSend = false;
+            let title = `Moje Media — ${apt.name || 'Mieszkanie'}`;
+            let body = '';
+            if (n.type === 'reading' && n.day === now.getDate()) {
+              const month = now.toISOString().slice(0, 7);
+              const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
+              if (!entry) { shouldSend = true; body = 'Nie zapomnij wpisać wskazań wody!'; }
+            }
+            if (n.type === 'payment' && n.day === now.getDate()) {
+              const month = now.toISOString().slice(0, 7);
+              const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
+              if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
+            }
+            if (shouldSend) {
+              console.log(`[CRON] Отправляю push для ${s.userId}`);
+              await sendPush(s.userId, title, body);
+              n.lastSent = today;
+            }
           }
         }
+        await s.save();
       }
-      await s.save();
-    }
-  } catch (e) { console.error('Push scheduler error:', e.message); }
-}, 60 * 60 * 1000); // каждый час
+    } catch (e) { console.error('Push scheduler error:', e.message); }
+  }, 60 * 60 * 1000); // каждый час
+}
 
-if (process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI).then(() => console.log('MongoDB connected')).catch(err => console.error('MongoDB connection error:', err.message));
+if (process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI).then(() => { console.log('MongoDB connected'); startPushScheduler(); }).catch(err => console.error('MongoDB connection error:', err.message));
 else console.warn('MONGODB_URI is not set. API runs, but persistent data is unavailable.');
 if (!process.env.JWT_SECRET) console.warn('JWT_SECRET is not set. Using an insecure development secret.');
 app.listen(PORT, () => console.log(`API listening on ${PORT}`));
