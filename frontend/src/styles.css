@@ -154,3 +154,5 @@ html.dark .chartTabs button.active{background:#1e293b;color:#e2e8f0}
 html.dark .qrImg{border-color:#334155}
 html.dark .aptSelect{background:#1e293b;border-color:#334155;color:#e2e8f0}
 .themeToggle{display:flex;align-items:center;gap:6px}
+html.dark .tabs{background:#0f172a}
+html.dark .tabs .active{background:#1e293b;color:#e2e8f0}
