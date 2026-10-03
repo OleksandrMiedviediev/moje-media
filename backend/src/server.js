@@ -55,6 +55,7 @@ const tariffSchema = new mongoose.Schema({
 }, { timestamps: true });
 const entrySchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  apartmentId: { type: String, default: 'a1', index: true },
   month: { type: String, required: true },
   previousWater: { type: Number, default: 0 },
   currentWater: { type: Number, default: 0 },
@@ -64,7 +65,7 @@ const entrySchema = new mongoose.Schema({
   tariffs: { type: Object, default: {} },
   note: { type: String, default: '' }
 }, { timestamps: true });
-entrySchema.index({ userId: 1, month: 1 }, { unique: true });
+entrySchema.index({ userId: 1, apartmentId: 1, month: 1 }, { unique: true });
 const settingsSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   value: { type: Object }
@@ -287,9 +288,10 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
     const body = pickEntry(req.body);
     if (!Object.keys(body).length) return res.status(400).json({ error: 'Brak danych' });
+    const apartmentId = String(req.body.apartmentId || 'a1');
     const doc = await Entry.findOneAndUpdate(
-      { userId: req.user._id, month: req.params.month },
-      body,
+      { userId: req.user._id, apartmentId, month: req.params.month },
+      { ...body, apartmentId },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     res.json(doc);

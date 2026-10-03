@@ -114,7 +114,8 @@ export function OnboardingScreen({ onDone }) {
       const numArea = Number(String(area).replace(',', '.')) || 0;
       const numResidents = Number(String(residents).replace(',', '.')) || 0;
       await apiPost('/api/auth/onboarding', { apartment, area: numArea, residents: numResidents });
-      onDone({ apartment, area: numArea, residents: numResidents });
+      // Новая структура: apartments[]
+      onDone({ apartments: [{ id: 'a1', name: apartment, area: numArea, residents: numResidents, customItems: [], tariffs: null }], activeApartmentId: 'a1' });
     } catch (e2) { setErr(e2.response?.data?.error || 'Błąd zapisu'); }
     finally { setBusy(false); }
   };

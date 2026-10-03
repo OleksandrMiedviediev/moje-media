@@ -35,10 +35,14 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
       const byYear = {};
       sortedEntries.forEach(e => {
         const y = e.month.slice(0, 4);
-        if (!byYear[y]) byYear[y] = { label: y, usage: 0, total: 0, count: 0 };
+        if (!byYear[y]) byYear[y] = { label: y, usage: 0, total: 0, count: 0, segments: { water: 0, sewage: 0, fixed: 0, custom: 0 } };
         byYear[y].usage += num(e.usage);
         byYear[y].total += num(e.total);
         byYear[y].count++;
+        byYear[y].segments.water += num(e.breakdown?.water);
+        byYear[y].segments.sewage += num(e.breakdown?.sewage);
+        byYear[y].segments.fixed += num(e.breakdown?.waste) + num(e.breakdown?.maintenance) + num(e.breakdown?.administration) + num(e.breakdown?.cleaning) + num(e.breakdown?.light) + num(e.breakdown?.renovation);
+        byYear[y].segments.custom += Object.values(e.custom || {}).reduce((s, c) => s + num(c.cost), 0);
       });
       return Object.values(byYear).sort((a, b) => a.label.localeCompare(b.label));
     }
@@ -46,13 +50,20 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
       label: `${e.month.slice(5)}.${e.month.slice(2, 4)}`,
       usage: num(e.usage),
       total: num(e.total),
-      month: e.month
+      month: e.month,
+      segments: {
+        water: num(e.breakdown?.water),
+        sewage: num(e.breakdown?.sewage),
+        fixed: num(e.breakdown?.waste) + num(e.breakdown?.maintenance) + num(e.breakdown?.administration) + num(e.breakdown?.cleaning) + num(e.breakdown?.light) + num(e.breakdown?.renovation),
+        custom: Object.values(e.custom || {}).reduce((s, c) => s + num(c.cost), 0)
+      }
     }));
   }, [sortedEntries, chartMode]);
 
   const maxUsage = Math.max(1, goal, ...chartData.map(d => d.usage));
+  const maxTotal = Math.max(1, ...chartData.map(d => d.total));
   const barMaxH = 150;
-  const labelH = 22; // место под значением столбика, чтобы не обрезалось
+  const labelH = 22;
 
   return (
     <>
@@ -71,22 +82,52 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
           <div className="chartTabs">
             <button className={chartMode === 'months' ? 'active' : ''} onClick={() => setChartMode('months')}>Miesiące</button>
             <button className={chartMode === 'years' ? 'active' : ''} onClick={() => setChartMode('years')}>Lata</button>
+            <button className={chartMode === 'costs' ? 'active' : ''} onClick={() => setChartMode('costs')}>Koszty</button>
           </div>
         </div>
         <div className="chartScroll">
           <div className="chart" style={{ height: `${barMaxH + labelH + 44}px` }}>
-            {chartData.map(d => (
-              <div className="barWrap" key={d.label}>
-                <div className={`bar${goal && d.usage > goal ? ' over' : ''}`} title={`${d.usage.toFixed(2)} m³ · ${money(d.total)}`} style={{ height: `${Math.max(8, d.usage / maxUsage * barMaxH)}px` }}>
-                  <span>{d.usage.toFixed(1)}</span>
+            {chartData.map(d => {
+              if (chartMode === 'costs') {
+                const total = Math.max(1, d.total);
+                const segs = [
+                  { key: 'water', val: d.segments.water, color: '#3b82f6', name: 'Woda' },
+                  { key: 'sewage', val: d.segments.sewage, color: '#06b6d4', name: 'Ścieki' },
+                  { key: 'fixed', val: d.segments.fixed, color: '#f59e0b', name: 'Opłaty stałe' },
+                  { key: 'custom', val: d.segments.custom, color: '#a855f7', name: 'Dodatkowe' }
+                ].filter(s => s.val > 0);
+                return (
+                  <div className="barWrap" key={d.label}>
+                    <div className="barStack" title={segs.map(s => `${s.name}: ${money(s.val)}`).join('\n')} style={{ height: `${Math.max(8, total / maxTotal * barMaxH)}px` }}>
+                      {segs.map(s => <div key={s.key} style={{ height: `${(s.val / total) * 100}%`, background: s.color }} />)}
+                      <span>{d.total.toFixed(0)}</span>
+                    </div>
+                    <small>{d.label}</small>
+                    <small className="barTotal">{d.total.toFixed(0)} zł</small>
+                  </div>
+                );
+              }
+              return (
+                <div className="barWrap" key={d.label}>
+                  <div className={`bar${goal && d.usage > goal ? ' over' : ''}`} title={`${d.usage.toFixed(2)} m³ · ${money(d.total)}`} style={{ height: `${Math.max(8, d.usage / maxUsage * barMaxH)}px` }}>
+                    <span>{d.usage.toFixed(1)}</span>
+                  </div>
+                  <small>{d.label}</small>
+                  <small className="barTotal">{d.total.toFixed(0)} zł</small>
                 </div>
-                <small>{d.label}</small>
-                <small className="barTotal">{d.total.toFixed(0)} zł</small>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-        {goal > 0 && <div className="goalInfo">Cel: {goal.toFixed(1).replace('.', ',')} m³/mies. ({num(settings.waterGoalPerPerson).toFixed(1).replace('.', ',')} m³ × {num(settings.residents)} os.) — czerwone słupki przekraczają cel.</div>}
+        {chartMode === 'costs' && (
+          <div className="legend">
+            <span><i style={{ background: '#3b82f6' }} />Woda</span>
+            <span><i style={{ background: '#06b6d4' }} />Ścieki</span>
+            <span><i style={{ background: '#f59e0b' }} />Opłaty stałe</span>
+            <span><i style={{ background: '#a855f7' }} />Dodatkowe</span>
+          </div>
+        )}
+        {goal > 0 && chartMode !== 'costs' && <div className="goalInfo">Cel: {goal.toFixed(1).replace('.', ',')} m³/mies. ({num(settings.waterGoalPerPerson).toFixed(1).replace('.', ',')} m³ × {num(settings.residents)} os.) — czerwone słupki przekraczają cel.</div>}
       </section>
 
       <section className="card">

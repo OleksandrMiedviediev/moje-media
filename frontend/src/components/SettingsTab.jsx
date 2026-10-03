@@ -6,32 +6,26 @@ import { Field } from './common';
 const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 
 export function SettingsTab({
-  settings, setSettings, tariffs, tariffMonth, setTariffMonth,
+  settings, setSettings, allSettings, apartments, activeApartmentId, onAddApartment, onRemoveApartment,
+  tariffs, tariffMonth, setTariffMonth,
   activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onLogout
 }) {
   const items = settings.customItems || [];
 
   const addItem = type => {
     const id = `c${Date.now()}`;
-    setSettings({
-      ...settings,
-      customItems: [...items, { id, type, name: '', unit: 'm³', rate: 0, amount: 0, active: true, lastValue: 0 }]
-    });
+    setSettings({ customItems: [...items, { id, type, name: '', unit: 'm³', rate: 0, amount: 0, active: true, lastValue: 0 }] });
   };
 
   const updateItem = (id, patch) => {
-    setSettings({
-      ...settings,
-      customItems: items.map(i => i.id === id ? { ...i, ...patch } : i)
-    });
+    setSettings({ customItems: items.map(i => i.id === id ? { ...i, ...patch } : i) });
   };
 
   const removeItem = async id => {
     const item = items.find(i => i.id === id);
     if (!confirm(`Usunąć „${item?.name || 'pozycję'}”? Stare miesiące zachowają tę pozycję w historii.`)) return;
     const next = items.filter(i => i.id !== id);
-    setSettings({ ...settings, customItems: next });
-    // Сразу сохранить на сервер
+    setSettings({ customItems: next });
     try { await onSaveSettings({ ...settings, customItems: next }); } catch { /* ignore */ }
   };
 
@@ -50,12 +44,35 @@ export function SettingsTab({
   return (
     <>
       <section className="card">
-        <h2><Home />Mieszkanie</h2>
+        <h2><Home />Mieszkania</h2>
+        <p>Zarządzaj adresami — dodaj kolejne mieszkanie lub usuń niepotrzebne.</p>
+        <div className="aptList">
+          {apartments.map(a => (
+            <div className={`aptRow${a.id === activeApartmentId ? ' active' : ''}`} key={a.id}>
+              <div>
+                <b>{a.name}</b>
+                <small>{num(a.area).toFixed(2).replace('.', ',')} m² · {num(a.residents)} os.</small>
+              </div>
+              {a.id === activeApartmentId && <span className="badge meter">Aktywne</span>}
+              {apartments.length > 1 && a.id !== activeApartmentId && (
+                <button className="removeBtn" onClick={() => onRemoveApartment(a.id)}><Trash2 size={14} />Usuń</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button className="secondary" onClick={() => {
+          const name = prompt('Nazwa / adres nowego mieszkania:', 'np. Słoneczna 12 / 4');
+          if (name?.trim()) onAddApartment({ name: name.trim(), area: 0, residents: 1, waterGoalPerPerson: 3 });
+        }}><Plus size={16} /> Dodaj mieszkanie</button>
+      </section>
+
+      <section className="card">
+        <h2><Home />Aktywne mieszkanie — {settings.name}</h2>
         <div className="grid">
-          <Field label="Adres / nazwa" value={settings.apartment} onChange={v => setSettings({ ...settings, apartment: v })} />
-          <Field label="Powierzchnia m²" value={settings.area} type="number" onChange={v => setSettings({ ...settings, area: num(v) })} />
-          <Field label="Liczba osób" value={settings.residents} type="number" onChange={v => setSettings({ ...settings, residents: num(v) })} />
-          <Field label="Cel wody m³/os./mies." value={settings.waterGoalPerPerson ?? ''} type="number" step="0.1" onChange={v => setSettings({ ...settings, waterGoalPerPerson: num(v) })} />
+          <Field label="Adres / nazwa" value={settings.name} onChange={v => setSettings({ name: v })} />
+          <Field label="Powierzchnia m²" value={settings.area} type="number" onChange={v => setSettings({ area: num(v) })} />
+          <Field label="Liczba osób" value={settings.residents} type="number" onChange={v => setSettings({ residents: num(v) })} />
+          <Field label="Cel wody m³/os./mies." value={settings.waterGoalPerPerson ?? ''} type="number" step="0.1" onChange={v => setSettings({ waterGoalPerPerson: num(v) })} />
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
         <button className="secondary logout" onClick={onLogout}><LogOut size={16} />Wyloguj się</button>

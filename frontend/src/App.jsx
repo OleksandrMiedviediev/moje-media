@@ -8,66 +8,112 @@ import { HomeTab, entryPayload } from './components/HomeTab';
 import { HistoryTab } from './components/HistoryTab';
 import { SettingsTab } from './components/SettingsTab';
 
+// Миграция: старые settings → apartments[]
+const migrateSettings = s => {
+  if (s.apartments) return s;
+  const apt = {
+    id: 'a1',
+    name: s.apartment || 'Mieszkanie',
+    area: s.area || 0,
+    residents: s.residents || 1,
+    waterGoalPerPerson: s.waterGoalPerPerson || 3,
+    customItems: s.customItems || [],
+    payeeName: s.payeeName || '',
+    payeeIban: s.payeeIban || '',
+    paymentNote: s.paymentNote || '',
+    payeeNip: s.payeeNip || '',
+    tariffs: s.tariffs || null
+  };
+  return { apartments: [apt], activeApartmentId: 'a1' };
+};
+
 export default function App() {
   const [auth, setAuth] = useState(() => {
     const t = localStorage.getItem('mb-token');
     return t ? { token: t, onboarded: true } : null;
   });
-  const [settings, setSettings] = useState(() => JSON.parse(localStorage.getItem('mb-settings') || 'null') || DEFAULT_SETTINGS);
-  const [tariffs, setTariffs] = useState(() => JSON.parse(localStorage.getItem('mb-tariffs') || 'null') || [{ effectiveFrom: '2026-01', values: DEFAULT_TARIFFS }]);
+  const [settings, setSettings] = useState(() => migrateSettings(JSON.parse(localStorage.getItem('mb-settings') || 'null') || DEFAULT_SETTINGS));
   const [entries, setEntries] = useState(() => JSON.parse(localStorage.getItem('mb-entries') || '[]'));
   const [month, setMonth] = useState(monthNow());
   const [water, setWater] = useState('');
   const [customReadings, setCustomReadings] = useState({});
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
-  const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
 
   useEffect(() => localStorage.setItem('mb-tab', tab), [tab]);
 
-  const sortedEntries = useMemo(() => [...entries].sort((a, b) => b.month.localeCompare(a.month)), [entries]);
-  const previousEntry = entries.filter(e => e.month < month).sort((a, b) => b.month.localeCompare(a.month))[0];
+  const activeApartment = settings.apartments?.find(a => a.id === settings.activeApartmentId) || settings.apartments?.[0];
+  const tariffs = activeApartment?.tariffs || [{ effectiveFrom: '2026-01', values: DEFAULT_TARIFFS }];
+
+  const sortedEntries = useMemo(() => entries.filter(e => e.apartmentId === settings.activeApartmentId).sort((a, b) => b.month.localeCompare(a.month)), [entries, settings.activeApartmentId]);
+  const previousEntry = sortedEntries.filter(e => e.month < month).sort((a, b) => b.month.localeCompare(a.month))[0];
   const previousWater = editing?.previousWater ?? previousEntry?.currentWater ?? 0;
   const selectedTariff = useMemo(
     () => tariffs.filter(t => t.effectiveFrom <= month).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.values || DEFAULT_TARIFFS,
     [tariffs, month]
   );
-  const tariffMonthValues = useMemo(
-    () => tariffs.filter(t => t.effectiveFrom <= tariffMonth).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.values || DEFAULT_TARIFFS,
-    [tariffs, tariffMonth]
-  );
-  const activeTariff = tariffs.find(t => t.effectiveFrom === tariffMonth)?.values || tariffMonthValues;
+  const activeTariff = tariffs.find(t => t.effectiveFrom === month)?.values || selectedTariff;
 
   useEffect(() => localStorage.setItem('mb-settings', JSON.stringify(settings)), [settings]);
-  useEffect(() => localStorage.setItem('mb-tariffs', JSON.stringify(tariffs)), [tariffs]);
   useEffect(() => localStorage.setItem('mb-entries', JSON.stringify(entries)), [entries]);
 
   useEffect(() => {
     if (!API || !auth) return;
     (async () => {
       try {
-        const [s, t, e] = await Promise.all([apiGet('/api/settings'), apiGet('/api/tariffs'), apiGet('/api/entries')]);
-        setSettings(s); setTariffs(t); setEntries(e);
+        const [s, e] = await Promise.all([apiGet('/api/settings'), apiGet('/api/entries')]);
+        setSettings(migrateSettings(s));
+        setEntries(e);
       } catch { setStatus('Tryb lokalny — API nie jest dostępne.'); }
     })();
   }, [auth]);
 
   const logout = () => { localStorage.removeItem('mb-token'); setAuth(null); };
 
+  const switchApartment = id => {
+    setSettings({ ...settings, activeApartmentId: id });
+    setWater(''); setCustomReadings({}); setEditing(null);
+  };
+
+  const addApartment = async data => {
+    const id = `a${Date.now()}`;
+    const apt = { id, ...data, customItems: [], tariffs: [{ effectiveFrom: '2026-01', values: DEFAULT_TARIFFS }] };
+    const next = { ...settings, apartments: [...settings.apartments, apt], activeApartmentId: id };
+    setSettings(next);
+    if (API) try { await apiPut('/api/settings', next); } catch { /* ignore */ }
+    return id;
+  };
+
+  const removeApartment = async id => {
+    const apt = settings.apartments.find(a => a.id === id);
+    if (!confirm(`Usunąć „${apt?.name}” wraz z całą historią?`)) return;
+    const nextApts = settings.apartments.filter(a => a.id !== id);
+    if (!nextApts.length) return;
+    const next = { ...settings, apartments: nextApts, activeApartmentId: nextApts[0].id };
+    setSettings(next);
+    setEntries(entries.filter(e => e.apartmentId !== id));
+    if (API) try { await apiPut('/api/settings', next); } catch { /* ignore */ }
+  };
+
   const saveEntry = async result => {
     if (!water) { setStatus('Wpisz aktualne wskazanie wody.'); return; }
     const payload = entryPayload(month, previousWater, water, result, selectedTariff, customReadings);
     payload.custom = result.custom;
     payload.customReadings = customReadings;
-    setEntries([...entries.filter(e => e.month !== month), payload]);
-    // Обновить lastValue счётчиков для следующего месяца
-    const updatedItems = (settings.customItems || []).map(item =>
-      item.type === 'meter' && customReadings[item.id] !== undefined
-        ? { ...item, lastValue: num(customReadings[item.id]) }
-        : item
+    payload.apartmentId = settings.activeApartmentId;
+    setEntries([...entries.filter(e => !(e.month === month && e.apartmentId === settings.activeApartmentId)), payload]);
+    // Обновить lastValue счётчиков активного адреса для следующего месяца
+    const updatedApts = settings.apartments.map(a =>
+      a.id === settings.activeApartmentId
+        ? { ...a, customItems: (a.customItems || []).map(item =>
+            item.type === 'meter' && customReadings[item.id] !== undefined
+              ? { ...item, lastValue: num(customReadings[item.id]) }
+              : item
+          ) }
+        : a
     );
-    if (updatedItems.length) setSettings({ ...settings, customItems: updatedItems });
+    setSettings({ ...settings, apartments: updatedApts });
     setEditing(null); setWater(''); setCustomReadings({});
     if (API) {
       try { await apiPut(`/api/entries/${month}`, payload); setStatus('Zapisano miesiąc.'); }
@@ -88,16 +134,28 @@ export default function App() {
 
   const saveTariff = async () => {
     const values = { ...activeTariff };
-    setTariffs([...tariffs.filter(t => t.effectiveFrom !== tariffMonth), { effectiveFrom: tariffMonth, values }]
-      .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom)));
-    if (API) try { await apiPut('/api/tariffs', { effectiveFrom: tariffMonth, values }); } catch { /* ignore */ }
+    const updatedApts = settings.apartments.map(a =>
+      a.id === settings.activeApartmentId
+        ? { ...a, tariffs: [...(a.tariffs || []).filter(t => t.effectiveFrom !== tariffMonth), { effectiveFrom: tariffMonth, values }].sort((x, y) => x.effectiveFrom.localeCompare(y.effectiveFrom)) }
+        : a
+    );
+    setSettings({ ...settings, apartments: updatedApts });
+    if (API) try { await apiPut('/api/settings', { ...settings, apartments: updatedApts }); } catch { /* ignore */ }
     setStatus(`Nowy taryfikator od ${tariffMonth}. Wcześniejsze miesiące bez zmian.`);
   };
 
-  const updateTariff = (key, value) => setTariffs(ts => ts.some(t => t.effectiveFrom === tariffMonth)
-    ? ts.map(t => t.effectiveFrom === tariffMonth ? { ...t, values: { ...t.values, [key]: num(value) } } : t)
-    : [...ts, { effectiveFrom: tariffMonth, values: { ...tariffMonthValues, [key]: num(value) } }]
-      .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom)));
+  const updateTariff = (key, value) => {
+    const tariffMonthValues = tariffs.filter(t => t.effectiveFrom <= tariffMonth).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.values || DEFAULT_TARIFFS;
+    const updatedApts = settings.apartments.map(a =>
+      a.id === settings.activeApartmentId
+        ? { ...a, tariffs: (a.tariffs || []).some(t => t.effectiveFrom === tariffMonth)
+            ? a.tariffs.map(t => t.effectiveFrom === tariffMonth ? { ...t, values: { ...t.values, [key]: num(value) } } : t)
+            : [...(a.tariffs || []), { effectiveFrom: tariffMonth, values: { ...tariffMonthValues, [key]: num(value) } }].sort((x, y) => x.effectiveFrom.localeCompare(y.effectiveFrom))
+          }
+        : a
+    );
+    setSettings({ ...settings, apartments: updatedApts });
+  };
 
   const saveSettings = async () => {
     if (API) {
@@ -117,9 +175,15 @@ export default function App() {
         <div>
           <div className="eyebrow">DOMOWE MEDIA</div>
           <h1>Moje Media</h1>
-          <div className="sub"><Home size={15} />{settings.apartment}</div>
+          {settings.apartments.length > 1 ? (
+            <select className="aptSelect" value={settings.activeApartmentId} onChange={e => switchApartment(e.target.value)}>
+              {settings.apartments.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          ) : (
+            <div className="sub"><Home size={15} />{activeApartment?.name}</div>
+          )}
         </div>
-        <div className="area">{num(settings.area).toFixed(2).replace('.', ',')} m²</div>
+        <div className="area">{num(activeApartment?.area).toFixed(2).replace('.', ',')} m²</div>
       </header>
 
       <nav className="tabs">
@@ -137,26 +201,31 @@ export default function App() {
             water={water} setWater={setWater}
             editing={editing} setEditing={setEditing}
             previousWater={previousWater}
-            settings={settings}
+            settings={activeApartment}
             selectedTariff={selectedTariff}
             onSave={saveEntry}
-            savedEntry={entries.find(e => e.month === month)}
+            savedEntry={entries.find(e => e.month === month && e.apartmentId === settings.activeApartmentId)}
             customReadings={customReadings}
             setCustomReadings={setCustomReadings}
           />
         )}
         {tab === 'history' && (
           <HistoryTab
-            entries={entries}
+            entries={sortedEntries}
             sortedEntries={sortedEntries}
-            settings={settings}
+            settings={activeApartment}
             onEdit={editEntry}
             onRemove={removeEntry}
           />
         )}
         {tab === 'settings' && (
           <SettingsTab
-            settings={settings} setSettings={setSettings}
+            settings={activeApartment} setSettings={patch => setSettings({ ...settings, apartments: settings.apartments.map(a => a.id === settings.activeApartmentId ? { ...a, ...patch } : a) })}
+            allSettings={settings}
+            apartments={settings.apartments}
+            activeApartmentId={settings.activeApartmentId}
+            onAddApartment={addApartment}
+            onRemoveApartment={removeApartment}
             tariffs={tariffs}
             tariffMonth={tariffMonth} setTariffMonth={setTariffMonth}
             activeTariff={activeTariff}

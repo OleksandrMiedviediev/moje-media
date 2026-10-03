@@ -59,3 +59,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .checkRow input{width:auto;margin:0;accent-color:#356ae6;cursor:pointer}
 .removeBtn{display:flex;align-items:center;gap:4px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .removeBtn:hover{background:#fee2e2}
+.aptSelect{margin-top:4px;border:1px solid #e2e7ef;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600;color:#4a5568;background:#fff;font-family:inherit;max-width:220px}
+.aptList{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.aptRow{display:flex;justify-content:space-between;align-items:center;border:1px solid #e5e9f0;border-radius:12px;padding:12px 14px;background:#fafbfd}
+.aptRow.active{border-color:#356ae6;background:#eef4ff}
+.aptRow b{display:block;font-size:14px}
+.aptRow small{display:block;font-size:12px;color:#7a8597;margin-top:2px}
+.barStack{width:30px;border-radius:8px 8px 4px 4px;display:flex;flex-direction:column-reverse;overflow:hidden;position:relative}
+.barStack>div{width:100%}
+.barStack span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:#7a8597;font-weight:700}
+.legend{display:flex;gap:14px;justify-content:center;margin-top:12px;padding-top:10px;border-top:1px solid #eef1f6;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#4a5568}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px}
