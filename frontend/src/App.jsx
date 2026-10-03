@@ -200,9 +200,16 @@ export default function App() {
 
   const saveSettings = async (override) => {
     const toSave = override || settings;
+    console.log('[SAVE SETTINGS]', toSave);
     if (API) {
-      try { await apiPut('/api/settings', toSave); setStatus('Ustawienia zapisane na serwerze.'); }
-      catch { setStatus('Zapisano lokalnie.'); }
+      try {
+        const res = await apiPut('/api/settings', toSave);
+        console.log('[SAVE SETTINGS] OK', res);
+        setStatus('Ustawienia zapisane na serwerze.');
+      } catch (e) {
+        console.error('[SAVE SETTINGS] BŁĄD', e.message, e.response?.data);
+        setStatus(`Zapisano lokalnie. Błąd: ${e.response?.data?.error || e.message}`);
+      }
     }
   };
 
