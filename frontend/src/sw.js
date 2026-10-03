@@ -1,4 +1,4 @@
-// Service Worker: кэширование (Workbox) + push-уведомления
+// Service Worker: кэширование (Workbox) + push-уведомления с логами
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkFirst } from 'workbox-strategies';
@@ -23,9 +23,17 @@ registerRoute(
   'GET'
 );
 
-// Push-уведомления
+// Push-уведомления с логами
 self.addEventListener('push', event => {
-  const data = event.data ? event.data.json() : {};
+  console.log('[SW] push event received');
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+    console.log('[SW] payload =', JSON.stringify(data));
+  } catch (e) {
+    console.error('[SW] payload parse error:', e.message);
+    data = { title: 'Moje Media', body: 'Nowe powiadomienie' };
+  }
   const title = data.title || 'Moje Media';
   const options = {
     body: data.body || '',
@@ -34,10 +42,12 @@ self.addEventListener('push', event => {
     tag: 'moje-media',
     data: { url: '/' }
   };
+  console.log('[SW] showNotification called:', title);
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', event => {
+  console.log('[SW] notificationclick');
   event.notification.close();
   event.waitUntil(clients.openWindow(event.notification.data?.url || '/'));
 });

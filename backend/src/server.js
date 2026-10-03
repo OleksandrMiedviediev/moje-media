@@ -335,16 +335,22 @@ async function sendPush(userId, title, body) {
   const subs = await Subscription.find({ userId });
   console.log(`[PUSH] Wysyłam do ${userId}, subskrypcji: ${subs.length}`);
   for (const sub of subs) {
+    console.log(`[PUSH] subscription found: ${sub.endpoint.slice(0, 60)}`);
+    console.log(`[PUSH] endpoint = ${sub.endpoint}`);
+    console.log(`[PUSH] p256dh length: ${sub.keys?.p256dh?.length}, auth length: ${sub.keys?.auth?.length}`);
+    console.log('[PUSH] sending...');
     try {
-      await webpush.sendNotification(
+      const result = await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys },
         JSON.stringify({ title, body }),
-        { TTL: 60 * 60 * 24 } // 24 часа
+        { TTL: 60 * 60 * 24 }
       );
+      console.log(`[PUSH] response = ${result.statusCode} ${result.statusMessage}`);
       console.log(`[PUSH] Wysłano: ${sub.endpoint.slice(0, 50)}...`);
     } catch (e) {
       console.error(`[PUSH] Błąd ${e.statusCode}: ${e.message}`);
-      if (e.statusCode === 410) await Subscription.deleteOne({ _id: sub._id }); // подписка устарела
+      console.error(`[PUSH] headers:`, e.headers);
+      if (e.statusCode === 410) await Subscription.deleteOne({ _id: sub._id });
     }
   }
 }
