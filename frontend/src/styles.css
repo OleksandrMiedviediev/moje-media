@@ -138,3 +138,18 @@ html.dark .link{color:#6c8eea}
 html.dark .empty{color:#64748b}
 html.dark .tariffHistory{color:#94a3b8}
 html.dark .tariffHistory>div{border-color:#334155}
+html.dark .card,html.dark .stats div{background:#1e293b!important;border-color:#334155!important}
+html.dark .usage{background:#0f172a!important}
+html.dark .historyDetails{background:#0f172a!important}
+html.dark .historyMain div b{color:#e2e8f0}
+html.dark .historyMain strong{color:#e2e8f0}
+html.dark .historyMain small{color:#94a3b8}
+html.dark .barWrap small{color:#94a3b8}
+html.dark .barTotal{color:#64748b}
+html.dark .month{color:#e2e8f0}
+html.dark .actions button{background:#334155;color:#e2e8f0}
+html.dark .add{background:#1e3a5f;color:#6c8eea}
+html.dark .chartTabs{background:#334155}
+html.dark .chartTabs button.active{background:#1e293b;color:#e2e8f0}
+html.dark .qrImg{border-color:#334155}
+html.dark .aptSelect{background:#1e293b;border-color:#334155;color:#e2e8f0}
