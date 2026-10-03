@@ -10,7 +10,7 @@ import { SettingsTab } from './components/SettingsTab';
 
 // Миграция: старые settings → apartments[]
 const migrateSettings = s => {
-  if (s.apartments) return { ...s, notifications: s.notifications || [] };
+  if (s.apartments) return s; // notifications теперь внутри каждого apartment
   const apt = {
     id: 'a1',
     name: s.apartment || 'Mieszkanie',
@@ -22,9 +22,10 @@ const migrateSettings = s => {
     payeeIban: s.payeeIban || '',
     paymentNote: s.paymentNote || '',
     payeeNip: s.payeeNip || '',
-    tariffs: s.tariffs || null
+    tariffs: s.tariffs || null,
+    notifications: s.notifications || [] // мигрируем общие в первый apartment
   };
-  return { apartments: [apt], activeApartmentId: 'a1', notifications: s.notifications || [] };
+  return { apartments: [apt], activeApartmentId: 'a1' };
 };
 
 export default function App() {

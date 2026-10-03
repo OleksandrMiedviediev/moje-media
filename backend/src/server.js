@@ -351,30 +351,32 @@ setInterval(async () => {
   try {
     const settings = await Setting.find({});
     for (const s of settings) {
-      const notifs = s.value?.notifications || [];
-      for (const n of notifs) {
-        if (!n.active || n.time !== time) continue;
-        // Проверка: сегодня уже отправляли?
-        if (n.lastSent === today) continue;
-        let shouldSend = false;
-        let title = 'Moje Media';
-        let body = '';
-        if (n.type === 'reading' && n.day === now.getDate()) {
-          const month = now.toISOString().slice(0, 7);
-          const entry = await Entry.findOne({ userId: s.userId, apartmentId: s.value.activeApartmentId || 'a1', month });
-          if (!entry) { shouldSend = true; body = 'Nie zapomnij wpisać wskazań wody!'; }
-        }
-        if (n.type === 'payment' && n.day === now.getDate()) {
-          const month = now.toISOString().slice(0, 7);
-          const entry = await Entry.findOne({ userId: s.userId, apartmentId: s.value.activeApartmentId || 'a1', month });
-          if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
-        }
-        if (shouldSend) {
-          await sendPush(s.userId, title, body);
-          n.lastSent = today;
-          await s.save();
+      const apts = s.value?.apartments || [];
+      for (const apt of apts) {
+        const notifs = apt.notifications || [];
+        for (const n of notifs) {
+          if (!n.active || n.time !== time) continue;
+          if (n.lastSent === today) continue;
+          let shouldSend = false;
+          let title = `Moje Media — ${apt.name || 'Mieszkanie'}`;
+          let body = '';
+          if (n.type === 'reading' && n.day === now.getDate()) {
+            const month = now.toISOString().slice(0, 7);
+            const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
+            if (!entry) { shouldSend = true; body = 'Nie zapomnij wpisać wskazań wody!'; }
+          }
+          if (n.type === 'payment' && n.day === now.getDate()) {
+            const month = now.toISOString().slice(0, 7);
+            const entry = await Entry.findOne({ userId: s.userId, apartmentId: apt.id, month });
+            if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
+          }
+          if (shouldSend) {
+            await sendPush(s.userId, title, body);
+            n.lastSent = today;
+          }
         }
       }
+      await s.save();
     }
   } catch (e) { console.error('Push scheduler error:', e.message); }
 }, 60 * 60 * 1000); // каждый час
