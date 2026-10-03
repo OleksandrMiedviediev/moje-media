@@ -88,73 +88,10 @@ export default function App() {
     })();
   }, [auth]);
 
-  // Подписка на push — вызывается из кнопки в NotificationsSection
+  // Email-уведомления — замена push
   const registerPush = async () => {
-    console.log('[PUSH] registerPush called');
-    if (!('serviceWorker' in navigator)) {
-      setStatus('Service Worker nie jest obsługiwany');
-      console.log('[PUSH] Service Worker not supported');
-      return;
-    }
-    if (!('PushManager' in window)) {
-      setStatus('Push notifications nie są obsługiwane');
-      console.log('[PUSH] PushManager not supported');
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    console.log('[PUSH] permission:', permission);
-    if (permission !== 'granted') {
-      setStatus('Brak zgody na powiadomienia');
-      return;
-    }
-    try {
-      console.log('[PUSH] registering SW...');
-      await navigator.serviceWorker.register('/sw.js');
-      console.log('[PUSH] SW registered');
-      const registration = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise((_, rej) => setTimeout(() => rej(new Error('SW timeout')), 5000))
-      ]);
-      console.log('[PUSH] SW ready');
-      const { key } = await apiGet('/api/push/vapid-key');
-      console.log('[PUSH] VAPID key received:', !!key);
-      if (!key) return;
-      console.log('[PUSH] subscribing...');
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key)
-      });
-      console.log('[PUSH] subscription created:', subscription.endpoint.slice(0, 50));
-      console.log('[PUSH] sending to server...');
-      await apiPost('/api/push/subscribe', subscription.toJSON());
-      console.log('[PUSH] saved to server');
-      setStatus('Powiadomienia włączone');
-    } catch (e) {
-      console.error('[PUSH] Error:', e.message);
-      setStatus(`Błąd push: ${e.message}`);
-    }
+    setStatus('Powiadomienia email — nie wymagają zgody');
   };
-
-  // Авто-подписка при загрузке (если уже разрешено)
-  useEffect(() => {
-    if (!API || !auth || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    if (Notification.permission !== 'granted') return;
-    (async () => {
-      try {
-        await navigator.serviceWorker.register('/sw.js');
-        const reg = await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('SW timeout')), 5000))
-        ]);
-        const { key } = await apiGet('/api/push/vapid-key');
-        if (!key) return;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await apiPost('/api/push/subscribe', sub.toJSON());
-        }
-      } catch { /* ignore */ }
-    })();
-  }, [auth]);
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);

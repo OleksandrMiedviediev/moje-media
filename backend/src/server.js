@@ -6,7 +6,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import webpush from 'web-push';
 import 'dotenv/config';
 
 mongoose.set('bufferCommands', false);
@@ -75,18 +74,6 @@ const User = mongoose.model('User', userSchema);
 const Tariff = mongoose.model('Tariff', tariffSchema);
 const Entry = mongoose.model('Entry', entrySchema);
 const Setting = mongoose.model('Setting', settingsSchema);
-
-// Push-подписки
-const subscriptionSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  endpoint: { type: String, required: true, unique: true },
-  keys: { p256dh: String, auth: String }
-}, { timestamps: true });
-const Subscription = mongoose.model('Subscription', subscriptionSchema);
-
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(process.env.FRONTEND_URL || 'https://moje-media.vercel.app', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
-}
 
 const defaultSettings = {
   apartment: '', area: 0, residents: 1,
@@ -315,50 +302,21 @@ app.delete('/api/entries/:month', auth, async (req, res) => { try { if (!isMonth
 // === PUSH ===
 app.get('/api/push/vapid-key', (_, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));
 
-app.post('/api/push/subscribe', auth, async (req, res) => {
-  try {
-    const { endpoint, keys } = req.body;
-    if (!endpoint || !keys?.p256dh || !keys?.auth) return res.status(400).json({ error: 'Brak danych subskrypcji' });
-    await Subscription.findOneAndUpdate({ endpoint }, { userId: req.user._id, endpoint, keys: sanitize(keys) }, { upsert: true, new: true });
-    res.json({ ok: true });
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-
 app.post('/api/push/unsubscribe', auth, async (req, res) => {
-  try { await Subscription.findOneAndDelete({ endpoint: req.body.endpoint }); res.json({ ok: true }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  res.status(410).json({ error: 'Push usunięty — używamy email' });
 });
 
-// Отправка уведомлений пользователю
-async function sendPush(userId, title, body) {
-  if (!process.env.VAPID_PRIVATE_KEY) { console.log('[PUSH] VAPID_PRIVATE_KEY nie ustawiony'); return; }
-  const subs = await Subscription.find({ userId });
-  console.log(`[PUSH] Wysyłam do ${userId}, subskrypcji: ${subs.length}`);
-  for (const sub of subs) {
-    console.log(`[PUSH] subscription found: ${sub.endpoint.slice(0, 60)}`);
-    console.log(`[PUSH] endpoint = ${sub.endpoint}`);
-    console.log(`[PUSH] p256dh length: ${sub.keys?.p256dh?.length}, auth length: ${sub.keys?.auth?.length}`);
-    console.log('[PUSH] sending...');
-    try {
-      const result = await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: sub.keys },
-        JSON.stringify({ title, body }),
-        { TTL: 60 * 60 * 24 }
-      );
-      console.log(`[PUSH] response = ${result.statusCode} ${result.statusMessage}`);
-      console.log(`[PUSH] Wysłano: ${sub.endpoint.slice(0, 50)}...`);
-    } catch (e) {
-      console.error(`[PUSH] Błąd ${e.statusCode}: ${e.message}`);
-      console.error(`[PUSH] headers:`, e.headers);
-      if (e.statusCode === 410) await Subscription.deleteOne({ _id: sub._id });
-    }
-  }
+// Email-уведомления через Brevo (замена push)
+async function sendNotificationEmail(userId, title, body) {
+  const user = await User.findById(userId);
+  if (!user) return;
+  await sendEmail(user.email, title, body);
 }
 
-// Тестовый endpoint: отправить push вручную (для диагностики)
+// Тестовый endpoint: отправить email вручную
 app.post('/api/push/test', auth, async (req, res) => {
   try {
-    await sendPush(req.user._id, 'Moje Media — test', 'To testowe powiadomienie. Działa!');
+    await sendNotificationEmail(req.user._id, 'Moje Media — test', 'To testowe powiadomienie email. Działa!');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -369,7 +327,7 @@ function startPushScheduler() {
   pushSchedulerStarted = true;
   console.log('[CRON] Push scheduler started (Europe/Warsaw)');
   setInterval(async () => {
-    if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
+    if (!process.env.BREVO_API_KEY || mongoose.connection.readyState !== 1) return;
     // Часовой пояс Польши
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
     const today = now.toISOString().slice(0, 10);
@@ -401,15 +359,15 @@ function startPushScheduler() {
               if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
             }
             if (shouldSend) {
-              console.log(`[CRON] Отправляю push для ${s.userId}`);
-              await sendPush(s.userId, title, body);
+              console.log(`[CRON] Wysyłam email dla ${s.userId}`);
+              await sendNotificationEmail(s.userId, title, body);
               n.lastSent = today;
             }
           }
         }
         await s.save();
       }
-    } catch (e) { console.error('Push scheduler error:', e.message); }
+    } catch (e) { console.error('Email scheduler error:', e.message); }
   }, 5 * 60 * 1000); // каждые 5 минут
 }
 

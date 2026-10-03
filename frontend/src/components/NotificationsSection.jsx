@@ -47,9 +47,9 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, ge
 
   const testPush = async () => {
     try {
-      setStatus('Wysyłam test...');
+      setStatus('Wysyłam test email...');
       await apiPost('/api/push/test');
-      setStatus('Test wysłany — sprawdź telefon');
+      setStatus('Test wysłany — sprawdź skrzynkę email');
     } catch (e) {
       setStatus(`Błąd testu: ${e.message}`);
     }
@@ -58,13 +58,13 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, ge
   return (
     <section className="card">
       <h2><Bell />Powiadomienia</h2>
-      <p>Przypomnienia o wpisaniu wskazań lub płatności — push na telefon.</p>
+      <p>Przypomnienia o wpisaniu wskazań lub płatności — na Twój email.</p>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <button className="secondary" onClick={registerPush}>
-          <Bell size={16} /> Włącz powiadomienia push
+          <Bell size={16} /> Powiadomienia email włączone
         </button>
         <button className="secondary" onClick={testPush} style={{ background: '#fef3c7', color: '#92400e' }}>
-          <Zap size={16} /> TEST PUSH
+          <Zap size={16} /> TEST EMAIL
         </button>
       </div>
 
