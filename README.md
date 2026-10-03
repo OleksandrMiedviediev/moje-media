@@ -20,22 +20,42 @@ Aplikacja do domowych rozliczeń mediów: woda, ścieki i opłaty stałe. Rejest
 - wpisujesz tylko **aktualne wskazanie wody** — zużycie i suma liczą się automatycznie;
 - rozbicie: zimna woda, ścieki, śmieci, konserwacja, administracja, sprzątanie, światło klatki, fundusz remontowy;
 - taryfy z datą obowiązywania — zmiana stawek nie rusza starych miesięcy;
-- po zapisie suma pozostaje widoczna (nie przelicza się z pustego pola).
+- po zapisie suma pozostaje widoczna (nie przelicza się z pustego pola);
+- **dodatkowe liczniki** (ciepła woda, gaz, prąd) i stałe opłaty (internet, TV) — dodaj w Ustawieniach;
+- **nowy licznik** — potwierdź wymianę, gdy wskazanie mniejsze niż poprzednie.
 
 ### 📈 Historia
 
 - lista miesięcy z filtrami po roku i paginacją (5/10/20/50 na stronę);
-- wykres zużycia z przewijaniem poziomym: miesiące lub suma roczna;
+- wykres zużycia z przewijaniem poziomym: miesiące, suma roczna, **koszty po kategoriach** (stek), **rok do roku**;
 - pod każdym słupkiem kwota do zapłaty;
 - **cel zużycia** (m³/os./mies.) — słupki powyżej celu podświetlone na czerwono;
 - rozwinięcie miesiąca: wskazania licznika + pełne rozbicie kosztów;
-- edycja, usunięcie, płatność dowolnego miesiąca.
+- edycja, usunięcie, płatność dowolnego miesiąca;
+- **eksport CSV** — pobierz historię do Excel.
 
 ### 💳 Płatność QR
 
 - kod QR w polskim standardzie **ZBP** — skanujesz w aplikacji banku (PKO, mBank, ING, Santander, Erste PL…);
 - automatycznie wypełnia: numer konta, NIP odbiorcy, kwotę, tytuł przelewu;
 - przycisk „Zapłać” przy bieżącym miesiącu i przy każdym miesiącu w historii.
+
+### 🏠 Wiele mieszkań
+
+- dodaj kolejne adresy w Ustawieniach → Mieszkania;
+- przełącznik w nagłówku — każde mieszkanie ma osobną historię, taryfy i ustawienia;
+- usuwanie z potwierdzeniem.
+
+### 🔔 Powiadomienia push
+
+- przypomnienia: wpisz wskazania / do zapłaty;
+- wybierz dzień miesiąca i godzinę;
+- działa po „zainstalowaniu” PWA na telefonie.
+
+### 🌙 Motyw ciemny
+
+- przełącznik w Ustawieniach → Mieszkania;
+- zapisuje wybór lokalnie.
 
 ### 💾 Zapamiętywanie
 
@@ -80,7 +100,9 @@ Otwórz http://localhost:5173 → zarejestruj się → potwierdź e-mail → pod
 | `FRONTEND_URL`  | `https://twoja-apka.vercel.app`                                          |
 | `JWT_SECRET`    | losowy ciąg (`openssl rand -hex 32`)                                     |
 | `BREVO_API_KEY` | `xkeysib-...` z [app.brevo.com](https://app.brevo.com/settings/keys/api) |
-| `SMTP_FROM`     | `Moje Media <twoj@gmail.com>`                                            |
+| `SMTP_FROM`         | `Moje Media <twoj@gmail.com>`                                            |
+| `VAPID_PUBLIC_KEY`  | `BBJh...` (dla push)                                                     |
+| `VAPID_PRIVATE_KEY` | `kbj8...` (dla push)                                                     |
 
 4. Deploy → skopiuj URL (np. `https://moje-media.onrender.com`)
 
@@ -134,10 +156,11 @@ moje-media/
 │   │   └── components/
 │   │       ├── Auth.jsx        # logowanie/rejestracja/reset
 │   │       ├── HomeTab.jsx     # bieżące rozliczenie + QR
-│   │       ├── HistoryTab.jsx  # historia, wykres, filtry
-│   │       └── SettingsTab.jsx # mieszkanie, taryfy, płatność
+│   │   │   ├── HistoryTab.jsx  # historia, wykres, filtry, CSV
+│   │   │   ├── SettingsTab.jsx # mieszkania, taryfy, płatność, motyw
+│   │   │   └── NotificationsSection.jsx # powiadomienia push
 │   ├── public/favicon.svg
-│   └── vite.config.js
+│   └── vite.config.js        # PWA + proxy
 └── package.json            # npm run dev — oba serwisy naraz
 ```
 
