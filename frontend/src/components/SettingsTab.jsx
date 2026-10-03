@@ -8,7 +8,7 @@ const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 export function SettingsTab({
   settings, setSettings, allSettings, apartments, activeApartmentId, onAddApartment, onRemoveApartment,
   tariffs, tariffMonth, setTariffMonth,
-  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onLogout, dark, setDark
+  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onDeleteTariff, onLogout, dark, setDark
 }) {
   const items = settings.customItems || [];
 
@@ -142,23 +142,41 @@ export function SettingsTab({
           <input type="month" value={tariffMonth} onChange={e => setTariffMonth(e.target.value)} />
         </label>
         <div className="grid">
-          {Object.entries(LABELS).map(([key, label]) => (
-            <Field
-              key={key}
-              label={label + (key.includes('PerM2') ? ' zł/m²' : key.includes('PerPerson') ? ' zł/os.' : key === 'cleaning' ? ' zł/lokal' : ' zł/jedn.')}
-              value={activeTariff[key]}
-              type="number"
-              step="0.01"
-              onChange={v => onUpdateTariff(key, v)}
-            />
+          {Object.entries(LABELS).filter(([key]) => activeTariff[key]?.active !== false).map(([key, label]) => (
+            <div key={key} className="tariffField">
+              <Field
+                label={label + (key.includes('PerM2') ? ' zł/m²' : key.includes('PerPerson') ? ' zł/os.' : key === 'cleaning' ? ' zł/lokal' : ' zł/jedn.')}
+                value={activeTariff[key]?.value ?? activeTariff[key]}
+                type="number"
+                step="0.01"
+                onChange={v => onUpdateTariff(key, v)}
+              />
+              <button className="removeBtn tariffRemove" onClick={() => onUpdateTariff(key, { ...(activeTariff[key]?.value !== undefined ? activeTariff[key] : { value: activeTariff[key] }), active: false })} title="Usuń pozycję">
+                <Trash2 size={13} />
+              </button>
+            </div>
           ))}
         </div>
+        {Object.entries(LABELS).some(([key]) => activeTariff[key]?.active === false) && (
+          <div className="authSub" style={{ marginTop: '10px', fontSize: '12px' }}>
+            Ukryte pozycje: {Object.entries(LABELS).filter(([key]) => activeTariff[key]?.active === false).map(([key, label]) => (
+              <button key={key} className="link" style={{ fontSize: '12px', padding: '2px 6px' }} onClick={() => onUpdateTariff(key, { ...activeTariff[key], active: true })}>+ {label}</button>
+            ))}
+          </div>
+        )}
         <div className="tariffHistory">
           <b>Historia zmian</b>
           {[...tariffs].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom)).map(t => (
-            <div key={t.effectiveFrom}>
-              <span>Od {t.effectiveFrom}</span>
-              <small>{money(t.values.coldWater)}/m³ woda · {money(t.values.sewage)}/m³ ścieki</small>
+            <div key={t.effectiveFrom} className="tariffRow">
+              <div>
+                <span>Od {t.effectiveFrom}</span>
+                <small>{money(t.values.coldWater)}/m³ woda · {money(t.values.sewage)}/m³ ścieki</small>
+              </div>
+              {tariffs.length > 1 && (
+                <button className="removeBtn" onClick={() => onDeleteTariff(t.effectiveFrom)} title="Usuń taryfikator">
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>

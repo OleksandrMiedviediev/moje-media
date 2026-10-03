@@ -8,22 +8,28 @@ export const monthLabel = m => new Intl.DateTimeFormat('pl-PL', { month: 'long',
 
 export const calc = (water, prev, settings, tariffs, customReadings = {}, newMeters = {}) => {
   const usage = Math.max(0, num(water) - num(prev));
-  const variable = usage * (num(tariffs.coldWater) + num(tariffs.sewage));
-  const fixed = num(tariffs.wastePerPerson) * num(settings.residents)
-    + num(tariffs.maintenancePerM2) * num(settings.area)
-    + num(tariffs.administrationPerM2) * num(settings.area)
-    + num(tariffs.cleaning)
-    + num(tariffs.stairLightPerPerson) * num(settings.residents)
-    + num(tariffs.renovationPerM2) * num(settings.area);
+  // Тариф: значение может быть числом или {value, active}
+  const t = key => {
+    const v = tariffs[key];
+    if (v && typeof v === 'object') return v.active === false ? 0 : num(v.value);
+    return num(v);
+  };
+  const variable = usage * (t('coldWater') + t('sewage'));
+  const fixed = t('wastePerPerson') * num(settings.residents)
+    + t('maintenancePerM2') * num(settings.area)
+    + t('administrationPerM2') * num(settings.area)
+    + t('cleaning')
+    + t('stairLightPerPerson') * num(settings.residents)
+    + t('renovationPerM2') * num(settings.area);
   const breakdown = {
-    water: usage * num(tariffs.coldWater),
-    sewage: usage * num(tariffs.sewage),
-    waste: num(tariffs.wastePerPerson) * num(settings.residents),
-    maintenance: num(tariffs.maintenancePerM2) * num(settings.area),
-    administration: num(tariffs.administrationPerM2) * num(settings.area),
-    cleaning: num(tariffs.cleaning),
-    light: num(tariffs.stairLightPerPerson) * num(settings.residents),
-    renovation: num(tariffs.renovationPerM2) * num(settings.area)
+    water: usage * t('coldWater'),
+    sewage: usage * t('sewage'),
+    waste: t('wastePerPerson') * num(settings.residents),
+    maintenance: t('maintenancePerM2') * num(settings.area),
+    administration: t('administrationPerM2') * num(settings.area),
+    cleaning: t('cleaning'),
+    light: t('stairLightPerPerson') * num(settings.residents),
+    renovation: t('renovationPerM2') * num(settings.area)
   };
 
   // Кастомные позиции: счётчики (meter) и фиксированные оплаты (fixed)

@@ -153,11 +153,13 @@ export default function App() {
 
   const updateTariff = (key, value) => {
     const tariffMonthValues = tariffs.filter(t => t.effectiveFrom <= tariffMonth).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.values || DEFAULT_TARIFFS;
+    // value может быть числом (простое обновление) или объектом {value, active}
+    const patch = typeof value === 'object' ? value : { value: num(value) };
     const updatedApts = settings.apartments.map(a =>
       a.id === settings.activeApartmentId
         ? { ...a, tariffs: (a.tariffs || []).some(t => t.effectiveFrom === tariffMonth)
-            ? a.tariffs.map(t => t.effectiveFrom === tariffMonth ? { ...t, values: { ...t.values, [key]: num(value) } } : t)
-            : [...(a.tariffs || []), { effectiveFrom: tariffMonth, values: { ...tariffMonthValues, [key]: num(value) } }].sort((x, y) => x.effectiveFrom.localeCompare(y.effectiveFrom))
+            ? a.tariffs.map(t => t.effectiveFrom === tariffMonth ? { ...t, values: { ...t.values, [key]: patch } } : t)
+            : [...(a.tariffs || []), { effectiveFrom: tariffMonth, values: { ...tariffMonthValues, [key]: patch } }].sort((x, y) => x.effectiveFrom.localeCompare(y.effectiveFrom))
           }
         : a
     );
