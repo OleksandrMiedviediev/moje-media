@@ -26,7 +26,7 @@ export function SettingsTab({
         <p>Dane odbiorcy do kodu QR — zeskanujesz go w aplikacji banku i zapłacisz jednym kliknięciem.</p>
         <div className="grid">
           <Field label="Odbiorca (nazwa)" value={settings.payeeName} onChange={v => setSettings({ ...settings, payeeName: v })} />
-          <Field label="IBAN odbiorcy" value={settings.payeeIban} onChange={v => setSettings({ ...settings, payeeIban: v.replace(/\s/g, '').toUpperCase() })} />
+          <Field label="Numer konta / IBAN" value={settings.payeeIban} onChange={v => setSettings({ ...settings, payeeIban: v.replace(/\s/g, '').toUpperCase() })} />
           <Field label="Tytuł przelewu (opcjonalnie)" value={settings.paymentNote} onChange={v => setSettings({ ...settings, paymentNote: v })} />
           <label>Waluta przelewu
             <select value={settings.paymentCurrency || 'EUR'} onChange={e => setSettings({ ...settings, paymentCurrency: e.target.value })}>

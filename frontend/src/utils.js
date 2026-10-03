@@ -29,9 +29,16 @@ export const calc = (water, prev, settings, tariffs) => {
 };
 
 // EPC069-12 QR payload — сканируется любым банковским приложением (Erste George, mBank, PKO...)
+export const toIban = raw => {
+  const s = String(raw || '').replace(/\s/g, '').toUpperCase();
+  // Польский номер счёта без префикса (26 цифр) → добавляем PL
+  if (/^\d{26}$/.test(s)) return `PL${s}`;
+  return s;
+};
+
 export const epcQrPayload = ({ name, iban, amount, note, currency = 'EUR' }) => {
   const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim().slice(0, 70);
-  const ibanClean = String(iban || '').replace(/\s/g, '').toUpperCase();
+  const ibanClean = toIban(iban);
   const amt = Number(amount || 0).toFixed(2);
   return [
     'BCD',       // Service Tag
