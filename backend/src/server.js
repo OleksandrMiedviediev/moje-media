@@ -85,7 +85,7 @@ const subscriptionSchema = new mongoose.Schema({
 const Subscription = mongoose.model('Subscription', subscriptionSchema);
 
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails('mailto:noreply@moje-media.app', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails(process.env.FRONTEND_URL || 'https://moje-media.vercel.app', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
 }
 
 const defaultSettings = {
@@ -331,12 +331,15 @@ app.post('/api/push/unsubscribe', auth, async (req, res) => {
 
 // Отправка уведомлений пользователю
 async function sendPush(userId, title, body) {
-  if (!process.env.VAPID_PRIVATE_KEY) return;
+  if (!process.env.VAPID_PRIVATE_KEY) { console.log('[PUSH] VAPID_PRIVATE_KEY nie ustawiony'); return; }
   const subs = await Subscription.find({ userId });
+  console.log(`[PUSH] Wysyłam do ${userId}, subskrypcji: ${subs.length}`);
   for (const sub of subs) {
     try {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify({ title, body }));
+      console.log(`[PUSH] Wysłano: ${sub.endpoint.slice(0, 50)}...`);
     } catch (e) {
+      console.error(`[PUSH] Błąd ${e.statusCode}: ${e.message}`);
       if (e.statusCode === 410) await Subscription.deleteOne({ _id: sub._id }); // подписка устарела
     }
   }
