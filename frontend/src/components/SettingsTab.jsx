@@ -1,4 +1,4 @@
-import { Home, LogOut, Plus, Settings, Trash2, WalletCards } from 'lucide-react';
+import { Home, LogOut, Moon, Plus, Settings, Sun, Trash2, WalletCards } from 'lucide-react';
 import { LABELS } from '../constants';
 import { money, num } from '../utils';
 import { Field } from './common';
@@ -8,7 +8,7 @@ const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 export function SettingsTab({
   settings, setSettings, allSettings, apartments, activeApartmentId, onAddApartment, onRemoveApartment,
   tariffs, tariffMonth, setTariffMonth,
-  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onLogout
+  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onLogout, dark, setDark
 }) {
   const items = settings.customItems || [];
 
@@ -61,10 +61,15 @@ export function SettingsTab({
             </div>
           ))}
         </div>
-        <button className="secondary" onClick={() => {
-          const name = prompt('Nazwa / adres nowego mieszkania:', 'np. Słoneczna 12 / 4');
-          if (name?.trim()) onAddApartment({ name: name.trim(), area: 0, residents: 1, waterGoalPerPerson: 3 });
-        }}><Plus size={16} /> Dodaj mieszkanie</button>
+        <div className="filters">
+          <button className="secondary" onClick={() => {
+            const name = prompt('Nazwa / adres nowego mieszkania:', 'np. Słoneczna 12 / 4');
+            if (name?.trim()) onAddApartment({ name: name.trim(), area: 0, residents: 1, waterGoalPerPerson: 3 });
+          }}><Plus size={16} /> Dodaj mieszkanie</button>
+          <button className="secondary themeToggle" onClick={() => setDark(d => !d)}>
+            {dark ? <Sun size={16} /> : <Moon size={16} />} {dark ? 'Jasny motyw' : 'Ciemny motyw'}
+          </button>
+        </div>
       </section>
 
       <section className="card">

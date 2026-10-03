@@ -191,12 +191,7 @@ export default function App() {
             <div className="sub"><Home size={15} />{activeApartment?.name}</div>
           )}
         </div>
-        <div className="area">
-          <button className="eye themeBtn" onClick={() => setDark(d => !d)} title={dark ? 'Jasny motyw' : 'Ciemny motyw'}>
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-          {num(activeApartment?.area).toFixed(2).replace('.', ',')} m²
-        </div>
+        <div className="area">{num(activeApartment?.area).toFixed(2).replace('.', ',')} m²</div>
       </header>
 
       <nav className="tabs">
@@ -246,6 +241,7 @@ export default function App() {
             onSaveTariff={saveTariff}
             onUpdateTariff={updateTariff}
             onLogout={logout}
+            dark={dark} setDark={setDark}
           />
         )}
       </main>
