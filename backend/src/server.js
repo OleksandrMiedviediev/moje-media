@@ -336,7 +336,11 @@ async function sendPush(userId, title, body) {
   console.log(`[PUSH] Wysyłam do ${userId}, subskrypcji: ${subs.length}`);
   for (const sub of subs) {
     try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify({ title, body }));
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: sub.keys },
+        JSON.stringify({ title, body }),
+        { TTL: 60 * 60 * 24 } // 24 часа
+      );
       console.log(`[PUSH] Wysłano: ${sub.endpoint.slice(0, 50)}...`);
     } catch (e) {
       console.error(`[PUSH] Błąd ${e.statusCode}: ${e.message}`);
