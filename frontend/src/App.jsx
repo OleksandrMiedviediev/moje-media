@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Home, Moon, Settings, Sun, WalletCards, X } from 'lucide-react';
 import { API, DEFAULT_SETTINGS, DEFAULT_TARIFFS } from './constants';
-import { apiDelete, apiGet, apiPut } from './api';
+import { apiDelete, apiGet, apiPost, apiPut } from './api';
 import { monthNow, num } from './utils';
 import { AuthScreen, OnboardingScreen } from './components/Auth';
 import { HomeTab, entryPayload } from './components/HomeTab';
