@@ -32,6 +32,8 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
   }, [sortedEntries, chartMode]);
 
   const maxUsage = Math.max(1, goal, ...chartData.map(d => d.usage));
+  const barMaxH = 150;
+  const labelH = 22; // место под значением столбика, чтобы не обрезалось
 
   return (
     <>
@@ -53,10 +55,10 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
           </div>
         </div>
         <div className="chartScroll">
-          <div className="chart">
+          <div className="chart" style={{ height: `${barMaxH + labelH + 44}px` }}>
             {chartData.map(d => (
               <div className="barWrap" key={d.label}>
-                <div className={`bar${goal && d.usage > goal ? ' over' : ''}`} title={`${d.usage.toFixed(2)} m³ · ${money(d.total)}`} style={{ height: `${Math.max(8, d.usage / maxUsage * 150)}px` }}>
+                <div className={`bar${goal && d.usage > goal ? ' over' : ''}`} title={`${d.usage.toFixed(2)} m³ · ${money(d.total)}`} style={{ height: `${Math.max(8, d.usage / maxUsage * barMaxH)}px` }}>
                   <span>{d.usage.toFixed(1)}</span>
                 </div>
                 <small>{d.label}</small>

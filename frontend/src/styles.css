@@ -28,3 +28,6 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .bar.over{background:#ef4444}
 .barWrap .bar{position:relative}
 .goalInfo{margin-top:10px;font-size:12px;color:#7c8799;border-top:1px dashed #e2e7ef;padding-top:10px}
+.chart{height:auto;overflow:visible;align-items:end}
+.barWrap{height:auto;justify-content:end}
+.bar span{top:auto;bottom:calc(100% + 4px)}
