@@ -1,14 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { money, monthLabel, num } from '../utils';
 import { Empty, Row } from './common';
 
+const PAGE_SIZES = [5, 10, 20, 50];
+
 export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove }) {
   const [expanded, setExpanded] = useState(null);
-  const [chartMode, setChartMode] = useState('months');
+  const [chartMode, setChartMode] = useState(() => localStorage.getItem('mb-chart-mode') || 'months');
+  const [yearFilter, setYearFilter] = useState(() => localStorage.getItem('mb-history-year') || 'all');
+  const [pageSize, setPageSize] = useState(() => Number(localStorage.getItem('mb-history-page-size')) || 10);
+  const [page, setPage] = useState(0);
 
-  const annual = sortedEntries.reduce((s, e) => s + num(e.total), 0);
-  const avg = sortedEntries.length ? annual / sortedEntries.length : 0;
+  useEffect(() => localStorage.setItem('mb-chart-mode', chartMode), [chartMode]);
+  useEffect(() => localStorage.setItem('mb-history-year', yearFilter), [yearFilter]);
+  useEffect(() => localStorage.setItem('mb-history-page-size', String(pageSize)), [pageSize]);
+
+  const years = useMemo(() => [...new Set(sortedEntries.map(e => e.month.slice(0, 4)))], [sortedEntries]);
+  const filtered = useMemo(() => yearFilter === 'all' ? sortedEntries : sortedEntries.filter(e => e.month.startsWith(yearFilter)), [sortedEntries, yearFilter]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
+  const annual = filtered.reduce((s, e) => s + num(e.total), 0);
+  const avg = filtered.length ? annual / filtered.length : 0;
   const goal = num(settings?.waterGoalPerPerson) * num(settings?.residents);
 
   const chartData = useMemo(() => {
@@ -72,32 +87,52 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
 
       <section className="card">
         <h2>Historia rozliczeń</h2>
-        {sortedEntries.length === 0 ? <Empty /> : (
-          <div className="history">
-            {sortedEntries.map(e => (
-              <div className="historyItem" key={e.month}>
-                <button className="historyMain" onClick={() => setExpanded(expanded === e.month ? null : e.month)}>
-                  <div>
-                    <b>{monthLabel(e.month)}</b>
-                    <small>{num(e.usage).toFixed(2).replace('.', ',')} m³ wody</small>
-                  </div>
-                  <strong>{money(e.total)}</strong>
-                  {expanded === e.month ? <ChevronUp /> : <ChevronDown />}
-                </button>
-                {expanded === e.month && (
-                  <div className="historyDetails">
-                    <Row name="Woda" value={e.breakdown?.water} />
-                    <Row name="Ścieki" value={e.breakdown?.sewage} />
-                    <Row name="Pozostałe" value={num(e.total) - num(e.breakdown?.water) - num(e.breakdown?.sewage)} />
-                    <div className="actions">
-                      <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
-                      <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>
+        <div className="filters">
+          <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setPage(0); }}>
+            <option value="all">Wszystkie lata</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}>
+            {PAGE_SIZES.map(n => <option key={n} value={n}>{n} na stronę</option>)}
+          </select>
+        </div>
+        {filtered.length === 0 ? <Empty /> : (
+          <>
+            <div className="history">
+              {pageItems.map(e => (
+                <div className="historyItem" key={e.month}>
+                  <button className="historyMain" onClick={() => setExpanded(expanded === e.month ? null : e.month)}>
+                    <div>
+                      <b>{monthLabel(e.month)}</b>
+                      <small>{num(e.usage).toFixed(2).replace('.', ',')} m³ wody</small>
                     </div>
-                  </div>
-                )}
+                    <strong>{money(e.total)}</strong>
+                    {expanded === e.month ? <ChevronUp /> : <ChevronDown />}
+                  </button>
+                  {expanded === e.month && (
+                    <div className="historyDetails">
+                      <Row name="Woda" value={e.breakdown?.water} />
+                      <Row name="Ścieki" value={e.breakdown?.sewage} />
+                      <Row name="Pozostałe" value={num(e.total) - num(e.breakdown?.water) - num(e.breakdown?.sewage)} />
+                      <div className="actions">
+                        <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
+                        <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {pageCount > 1 && (
+              <div className="pagination">
+                <button disabled={safePage === 0} onClick={() => setPage(0)}>«</button>
+                <button disabled={safePage === 0} onClick={() => setPage(p => p - 1)}>‹</button>
+                <span>{safePage + 1} / {pageCount}</span>
+                <button disabled={safePage >= pageCount - 1} onClick={() => setPage(p => p + 1)}>›</button>
+                <button disabled={safePage >= pageCount - 1} onClick={() => setPage(pageCount - 1)}>»</button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </section>
     </>

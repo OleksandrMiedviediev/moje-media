@@ -19,9 +19,11 @@ export default function App() {
   const [month, setMonth] = useState(monthNow());
   const [water, setWater] = useState('');
   const [editing, setEditing] = useState(null);
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
   const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
+
+  useEffect(() => localStorage.setItem('mb-tab', tab), [tab]);
 
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => b.month.localeCompare(a.month)), [entries]);
   const previousEntry = entries.filter(e => e.month < month).sort((a, b) => b.month.localeCompare(a.month))[0];
