@@ -15,17 +15,17 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings }) 
 
   const addNotif = () => {
     const id = `n${Date.now()}`;
-    setSettings(prev => ({ ...prev, notifications: [...(prev.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }] }));
+    setSettings({ notifications: [...(settings.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }] });
   };
 
   const updateNotif = (id, patch) => {
-    setSettings(prev => ({ ...prev, notifications: (prev.notifications || []).map(n => n.id === id ? { ...n, ...patch } : n) }));
+    setSettings({ notifications: (settings.notifications || []).map(n => n.id === id ? { ...n, ...patch } : n) });
   };
 
   const removeNotif = async id => {
     if (!confirm('Usunąć przypomnienie?')) return;
-    const next = notifs.filter(n => n.id !== id);
-    setSettings(prev => ({ ...prev, notifications: next }));
+    const next = (settings.notifications || []).filter(n => n.id !== id);
+    setSettings({ notifications: next });
     try { await onSaveSettings({ ...settings, notifications: next }); } catch { /* ignore */ }
   };
 
