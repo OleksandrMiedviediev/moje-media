@@ -106,7 +106,9 @@ export default function App() {
           await apiPost('/api/push/subscribe', newSub.toJSON());
           console.log('[PUSH] Subscribed');
         } else {
-          console.log('[PUSH] Already subscribed');
+          // Всегда отправляем на сервер — если там нет, восстановится
+          await apiPost('/api/push/subscribe', sub.toJSON());
+          console.log('[PUSH] Already subscribed — synced to server');
         }
       } catch (e) { console.error('[PUSH] Error:', e.message); }
     })();
