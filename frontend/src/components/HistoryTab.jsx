@@ -1,10 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronUp, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, Download, Pencil, QrCode, Trash2 } from 'lucide-react';
 import { money, monthLabel, num } from '../utils';
 import { Empty, Row } from './common';
 import { PayQrModal } from './HomeTab';
 
 const PAGE_SIZES = [5, 10, 20, 50];
+
+const exportCSV = (entries, settings) => {
+  const headers = ['Miesiąc', 'Poprzednie wskazanie', 'Aktualne wskazanie', 'Zużycie m³', 'Zimna woda', 'Ścieki', 'Śmieci', 'Konserwacja', 'Administracja', 'Sprzątanie', 'Światło klatki', 'Fundusz remontowy', 'Dodatkowe', 'Razem zł'];
+  const rows = entries.map(e => {
+    const customTotal = Object.values(e.custom || {}).reduce((s, c) => s + num(c.cost), 0);
+    return [
+      e.month,
+      num(e.previousWater).toFixed(2),
+      num(e.currentWater).toFixed(2),
+      num(e.usage).toFixed(2),
+      num(e.breakdown?.water).toFixed(2),
+      num(e.breakdown?.sewage).toFixed(2),
+      num(e.breakdown?.waste).toFixed(2),
+      num(e.breakdown?.maintenance).toFixed(2),
+      num(e.breakdown?.administration).toFixed(2),
+      num(e.breakdown?.cleaning).toFixed(2),
+      num(e.breakdown?.light).toFixed(2),
+      num(e.breakdown?.renovation).toFixed(2),
+      customTotal.toFixed(2),
+      num(e.total).toFixed(2)
+    ];
+  });
+  const csv = [headers, ...rows].map(r => r.join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `moje-media-${settings?.name || 'eksport'}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove }) {
   const [expanded, setExpanded] = useState(null);
@@ -46,6 +77,20 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
       });
       return Object.values(byYear).sort((a, b) => a.label.localeCompare(b.label));
     }
+    if (chartMode === 'yoy') {
+      // Сравнение год к году: группируем по месяцу (01-12), внутри — года
+      const byMonth = {};
+      sortedEntries.forEach(e => {
+        const m = e.month.slice(5);
+        const y = e.month.slice(0, 4);
+        if (!byMonth[m]) byMonth[m] = {};
+        byMonth[m][y] = { usage: num(e.usage), total: num(e.total) };
+      });
+      return Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).map(([m, yearsMap]) => ({
+        label: m,
+        years: Object.entries(yearsMap).sort(([a], [b]) => a.localeCompare(b))
+      }));
+    }
     return [...sortedEntries].reverse().map(e => ({
       label: `${e.month.slice(5)}.${e.month.slice(2, 4)}`,
       usage: num(e.usage),
@@ -60,10 +105,11 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
     }));
   }, [sortedEntries, chartMode]);
 
-  const maxUsage = Math.max(1, goal, ...chartData.map(d => d.usage));
-  const maxTotal = Math.max(1, ...chartData.map(d => d.total));
+  const maxUsage = Math.max(1, goal, ...chartData.map(d => d.usage ?? Math.max(...(d.years || []).map(([, v]) => v.usage), 0)));
+  const maxTotal = Math.max(1, ...chartData.map(d => d.total ?? Math.max(...(d.years || []).map(([, v]) => v.total), 0)));
   const barMaxH = 150;
   const labelH = 22;
+  const yoyYears = [...new Set(sortedEntries.map(e => e.month.slice(0, 4)))].sort();
 
   return (
     <>
@@ -83,11 +129,32 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
             <button className={chartMode === 'months' ? 'active' : ''} onClick={() => setChartMode('months')}>Miesiące</button>
             <button className={chartMode === 'years' ? 'active' : ''} onClick={() => setChartMode('years')}>Lata</button>
             <button className={chartMode === 'costs' ? 'active' : ''} onClick={() => setChartMode('costs')}>Koszty</button>
+            <button className={chartMode === 'yoy' ? 'active' : ''} onClick={() => setChartMode('yoy')}>Rok do roku</button>
           </div>
         </div>
         <div className="chartScroll">
           <div className="chart" style={{ height: `${barMaxH + labelH + 44}px` }}>
             {chartData.map(d => {
+              if (chartMode === 'yoy') {
+                return (
+                  <div className="barWrap yoyWrap" key={d.label}>
+                    <div className="yoyBars">
+                      {d.years.map(([year, val]) => (
+                        <div
+                          key={year}
+                          className="bar"
+                          title={`${year}: ${val.usage.toFixed(2)} m³ · ${money(val.total)}`}
+                          style={{ height: `${Math.max(8, val.usage / maxUsage * barMaxH)}px`, background: year === yoyYears[yoyYears.length - 1] ? '#356ae6' : '#a5b8d4' }}
+                        >
+                          <span>{val.usage.toFixed(1)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <small>{d.label}</small>
+                    <small className="barTotal">{d.years.map(([y, v]) => `${y.slice(2)}: ${v.total.toFixed(0)}`).join(' ')} zł</small>
+                  </div>
+                );
+              }
               if (chartMode === 'costs') {
                 const total = Math.max(1, d.total);
                 const segs = [
@@ -119,6 +186,13 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
             })}
           </div>
         </div>
+        {chartMode === 'yoy' && (
+          <div className="legend">
+            {yoyYears.map((y, i) => (
+              <span key={y}><i style={{ background: i === yoyYears.length - 1 ? '#356ae6' : '#a5b8d4' }} />{y}</span>
+            ))}
+          </div>
+        )}
         {chartMode === 'costs' && (
           <div className="legend">
             <span><i style={{ background: '#3b82f6' }} />Woda</span>
@@ -131,7 +205,12 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
       </section>
 
       <section className="card">
-        <h2>Historia rozliczeń</h2>
+        <div className="cardHead">
+          <div><h2>Historia rozliczeń</h2></div>
+          <button className="secondary exportBtn" onClick={() => exportCSV(filtered, settings)} title="Pobierz CSV">
+            <Download size={15} />CSV
+          </button>
+        </div>
         <div className="filters">
           <select value={yearFilter} onChange={e => { setYearFilter(e.target.value); setPage(0); }}>
             <option value="all">Wszystkie lata</option>

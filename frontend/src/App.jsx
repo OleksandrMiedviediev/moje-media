@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Home, Settings, WalletCards, X } from 'lucide-react';
+import { BarChart3, Home, Moon, Settings, Sun, WalletCards, X } from 'lucide-react';
 import { API, DEFAULT_SETTINGS, DEFAULT_TARIFFS } from './constants';
 import { apiDelete, apiGet, apiPut } from './api';
 import { monthNow, num } from './utils';
@@ -41,6 +41,12 @@ export default function App() {
   const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
   const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
+  const [dark, setDark] = useState(() => localStorage.getItem('mb-theme') === 'dark');
+
+  useEffect(() => {
+    localStorage.setItem('mb-theme', dark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', dark);
+  }, [dark]);
 
   useEffect(() => localStorage.setItem('mb-tab', tab), [tab]);
 
@@ -185,7 +191,12 @@ export default function App() {
             <div className="sub"><Home size={15} />{activeApartment?.name}</div>
           )}
         </div>
-        <div className="area">{num(activeApartment?.area).toFixed(2).replace('.', ',')} m²</div>
+        <div className="area">
+          <button className="eye themeBtn" onClick={() => setDark(d => !d)} title={dark ? 'Jasny motyw' : 'Ciemny motyw'}>
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          {num(activeApartment?.area).toFixed(2).replace('.', ',')} m²
+        </div>
       </header>
 
       <nav className="tabs">
