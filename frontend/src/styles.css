@@ -12,3 +12,7 @@
 .link{background:none;border:0;color:#356ae6;font-weight:700;font-size:13px;cursor:pointer;padding:8px;text-align:center;font-family:inherit}
 .primary{margin-top:4px}
 .logout{margin-top:10px;color:#b91c1c;display:flex;align-items:center;gap:6px}
+.passWrap{position:relative;display:block}
+.passWrap input{width:100%;padding-right:42px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#8a94a6;cursor:pointer;padding:6px;display:grid;place-items:center}
+.eye:hover{color:#356ae6}
