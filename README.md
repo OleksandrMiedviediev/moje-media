@@ -94,12 +94,12 @@ Otwórz http://localhost:5173 → zarejestruj się → potwierdź e-mail → pod
 2. Build: `npm install` · Start: `npm start`
 3. Environment Variables:
 
-| Key             | Value                                                                    |
-| --------------- | ------------------------------------------------------------------------ |
-| `MONGODB_URI`   | `mongodb+srv://user:pass@cluster.mongodb.net/media-billing`              |
-| `FRONTEND_URL`  | `https://twoja-apka.vercel.app`                                          |
-| `JWT_SECRET`    | losowy ciąg (`openssl rand -hex 32`)                                     |
-| `BREVO_API_KEY` | `xkeysib-...` z [app.brevo.com](https://app.brevo.com/settings/keys/api) |
+| Key                 | Value                                                                    |
+| ------------------- | ------------------------------------------------------------------------ |
+| `MONGODB_URI`       | `mongodb+srv://user:pass@cluster.mongodb.net/media-billing`              |
+| `FRONTEND_URL`      | `https://twoja-apka.vercel.app`                                          |
+| `JWT_SECRET`        | losowy ciąg (`openssl rand -hex 32`)                                     |
+| `BREVO_API_KEY`     | `xkeysib-...` z [app.brevo.com](https://app.brevo.com/settings/keys/api) |
 | `SMTP_FROM`         | `Moje Media <twoj@gmail.com>`                                            |
 | `VAPID_PUBLIC_KEY`  | `BBJh...` (dla push)                                                     |
 | `VAPID_PRIVATE_KEY` | `kbj8...` (dla push)                                                     |

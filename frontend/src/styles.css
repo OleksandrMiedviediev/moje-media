@@ -159,3 +159,5 @@ html.dark .tabs .active{background:#1e293b;color:#e2e8f0}
 .tariffField{position:relative}
 .tariffRemove{position:absolute;top:0;right:0;padding:4px;background:none;border:0;color:#b91c1c;cursor:pointer;opacity:0;transition:opacity .15s}
 .tariffField:hover .tariffRemove{opacity:1}
+input[type="time"]{width:100%;max-width:100%;min-width:0;appearance:none;-webkit-appearance:none;min-height:44px}
+@supports (-webkit-appearance:none){input[type="time"]::-webkit-date-and-time-value{text-align:left}}
