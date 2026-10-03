@@ -35,11 +35,16 @@ export const toIban = raw => {
   return s;
 };
 
+// Номер счёта БЕЗ префикса PL (для ZBP поле 3)
+export const accountNumber = raw => {
+  const s = String(raw || '').replace(/\s/g, '').toUpperCase();
+  return s.startsWith('PL') ? s.slice(2) : s;
+};
+
 export const zbpQrPayload = ({ name, iban, amount, note, nip }) => {
   const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim();
-  const ibanClean = toIban(iban);
-  const grosze = Math.round(Number(amount || 0) * 100);
-  const reserved = '';
-  // ZBP: NIP получателя в поле 6 (reserved), если задан
-  return `${reserved}|${ibanClean}|${grosze}|${clean(name)}|${clean(note)}|${reserved}|${clean(nip)}|${reserved}`;
+  const account = accountNumber(iban);
+  const grosze = String(Math.round(Number(amount || 0) * 100)).padStart(9, '0');
+  const nipClean = String(nip || '').replace(/\D/g, '');
+  return `${nipClean}|PL|${account}|${grosze}|${clean(name)}|${clean(note)}|||`;
 };
