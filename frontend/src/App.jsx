@@ -199,8 +199,8 @@ export default function App() {
   };
 
   const saveSettings = async (override) => {
-    // override может быть event из onClick — игнорируем
-    const toSave = (override && typeof override === 'object' && !override.nativeEvent) ? override : settings;
+    // override может быть SyntheticEvent из onClick — игнорируем
+    const toSave = (override && typeof override === 'object' && !override.target && !override._reactName) ? override : settings;
     console.log('[SAVE SETTINGS]', toSave);
     if (API) {
       try {
