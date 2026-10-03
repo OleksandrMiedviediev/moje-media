@@ -292,6 +292,7 @@ export default function App() {
             onLogout={logout}
             dark={dark} setDark={setDark}
             setAllSettings={setSettings}
+            getAllSettings={() => settings}
           />
         )}
       </main>

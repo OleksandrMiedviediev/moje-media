@@ -7,14 +7,17 @@ const NOTIF_TYPES = [
   { id: 'payment', name: 'Do zapłaty' }
 ];
 
-export function NotificationsSection({ settings, setSettings, onSaveSettings, allSettings, activeApartmentId }) {
+export function NotificationsSection({ settings, setSettings, onSaveSettings, getAllSettings, activeApartmentId }) {
   const notifs = settings.notifications || [];
   const [newType, setNewType] = useState('reading');
   const [newDay, setNewDay] = useState('25');
   const [newTime, setNewTime] = useState('18:00');
 
   const save = async (updatedApt) => {
-    try { await onSaveSettings({ ...allSettings, apartments: allSettings.apartments.map(a => a.id === activeApartmentId ? updatedApt : a) }); } catch { /* ignore */ }
+    try {
+      const current = getAllSettings();
+      await onSaveSettings({ ...current, apartments: current.apartments.map(a => a.id === activeApartmentId ? updatedApt : a) });
+    } catch { /* ignore */ }
   };
 
   const addNotif = async () => {
@@ -94,7 +97,7 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
         </div>
         <button className="secondary" onClick={addNotif} style={{ marginTop: '10px' }}><Plus size={15} /> Dodaj przypomnienie</button>
       </div>
-      <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
+      <button className="secondary" onClick={() => save(settings)}>Zapisz dane</button>
     </section>
   );
 }
