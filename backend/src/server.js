@@ -4,7 +4,6 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
 import 'dotenv/config';
 
 mongoose.set('bufferCommands', false);
@@ -72,45 +71,36 @@ async function auth(req, res, next) {
   } catch { res.status(401).json({ error: 'Nieprawidłowy token' }); }
 }
 
-const mailer = process.env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    })
-  : null;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
 
-async function sendVerificationEmail(email, token) {
-  const baseUrl = allowed[0] === '*' || !allowed[0] ? 'http://localhost:5173' : allowed[0];
-  const link = `${baseUrl}/?verify=${token}`;
-  const text = `Witaj!\n\nPotwierdź swój adres e-mail klikając w link:\n${link}\n\nJeśli to nie Ty zakładałeś konto, zignoruj tę wiadomość.`;
-  if (!mailer) {
-    console.log(`[DEV] Verification link for ${email}: ${link}`);
+async function sendEmail(to, subject, text) {
+  if (!BREVO_API_KEY) {
+    console.log(`[DEV] Email to ${to} | ${subject}\n${text}`);
     return;
   }
-  await mailer.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to: email,
-    subject: 'Moje Media — potwierdzenie adresu e-mail',
-    text
+  const fromRaw = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@example.com';
+  const match = fromRaw.match(/^(?:(.*?)\s*)?<([^>]+)>$/);
+  const sender = match ? { name: match[1] || 'Moje Media', email: match[2] } : { email: fromRaw };
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text })
   });
+  if (!resp.ok) throw new Error(`Brevo API ${resp.status}: ${await resp.text()}`);
+}
+
+const baseUrl = allowed[0] === '*' || !allowed[0] ? 'http://localhost:5173' : allowed[0];
+
+async function sendVerificationEmail(email, token) {
+  const link = `${baseUrl}/?verify=${token}`;
+  await sendEmail(email, 'Moje Media — potwierdzenie adresu e-mail',
+    `Witaj!\n\nPotwierdź swój adres e-mail klikając w link:\n${link}\n\nJeśli to nie Ty zakładałeś konto, zignoruj tę wiadomość.`);
 }
 
 async function sendPasswordResetEmail(email, token) {
-  const baseUrl = allowed[0] === '*' || !allowed[0] ? 'http://localhost:5173' : allowed[0];
   const link = `${baseUrl}/?reset=${token}`;
-  const text = `Witaj!\n\nOtrzymaliśmy prośbę o zresetowanie hasła. Kliknij w link (ważny 1 godzinę):\n${link}\n\nJeśli to nie Ty prosiłeś o reset, zignoruj tę wiadomość — hasło pozostanie bez zmian.`;
-  if (!mailer) {
-    console.log(`[DEV] Password reset link for ${email}: ${link}`);
-    return;
-  }
-  await mailer.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to: email,
-    subject: 'Moje Media — reset hasła',
-    text
-  });
+  await sendEmail(email, 'Moje Media — reset hasła',
+    `Witaj!\n\nOtrzymaliśmy prośbę o zresetowanie hasła. Kliknij w link (ważny 1 godzinę):\n${link}\n\nJeśli to nie Ty prosiłeś o reset, zignoruj tę wiadomość — hasło pozostanie bez zmian.`);
 }
 
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -126,7 +116,7 @@ app.post('/api/auth/register', async (req, res) => {
     await User.create({ email, passwordHash: await bcrypt.hash(password, 10), verifyToken });
     try { await sendVerificationEmail(email, verifyToken); }
     catch (e) { console.error('Email send error:', e.message); }
-    res.status(201).json({ ok: true, message: 'Sprawdź skrzynkę e-mail i potwierdź adres', devLink: mailer ? undefined : `/?verify=${verifyToken}` });
+    res.status(201).json({ ok: true, message: 'Sprawdź skrzynkę e-mail i potwierdź adres', devLink: BREVO_API_KEY ? undefined : `/?verify=${verifyToken}` });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
