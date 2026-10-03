@@ -10,7 +10,7 @@ import { SettingsTab } from './components/SettingsTab';
 
 // Миграция: старые settings → apartments[]
 const migrateSettings = s => {
-  if (s.apartments) return s;
+  if (s.apartments) return { ...s, notifications: s.notifications || [] };
   const apt = {
     id: 'a1',
     name: s.apartment || 'Mieszkanie',
@@ -24,7 +24,7 @@ const migrateSettings = s => {
     payeeNip: s.payeeNip || '',
     tariffs: s.tariffs || null
   };
-  return { apartments: [apt], activeApartmentId: 'a1' };
+  return { apartments: [apt], activeApartmentId: 'a1', notifications: s.notifications || [] };
 };
 
 export default function App() {

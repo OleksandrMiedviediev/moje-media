@@ -134,7 +134,7 @@ export function SettingsTab({
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
       </section>
 
-      <NotificationsSection settings={settings} setSettings={setSettings} onSaveSettings={onSaveSettings} />
+      <NotificationsSection settings={allSettings} setSettings={patch => setSettings({ ...allSettings, ...patch })} onSaveSettings={onSaveSettings} />
 
       <section className="card">
         <div className="cardHead">
