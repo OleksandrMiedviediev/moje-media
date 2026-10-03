@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import webpush from 'web-push';
 import 'dotenv/config';
 
 mongoose.set('bufferCommands', false);
@@ -74,6 +75,18 @@ const User = mongoose.model('User', userSchema);
 const Tariff = mongoose.model('Tariff', tariffSchema);
 const Entry = mongoose.model('Entry', entrySchema);
 const Setting = mongoose.model('Setting', settingsSchema);
+
+// Push-подписки
+const subscriptionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  endpoint: { type: String, required: true, unique: true },
+  keys: { p256dh: String, auth: String }
+}, { timestamps: true });
+const Subscription = mongoose.model('Subscription', subscriptionSchema);
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails('mailto:noreply@moje-media.app', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+}
 
 const defaultSettings = {
   apartment: '', area: 0, residents: 1,
@@ -298,6 +311,73 @@ app.put('/api/entries/:month', auth, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.delete('/api/entries/:month', auth, async (req, res) => { try { if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' }); await Entry.findOneAndDelete({ userId: req.user._id, month: req.params.month }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
+
+// === PUSH ===
+app.get('/api/push/vapid-key', (_, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));
+
+app.post('/api/push/subscribe', auth, async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) return res.status(400).json({ error: 'Brak danych subskrypcji' });
+    await Subscription.findOneAndUpdate({ endpoint }, { userId: req.user._id, endpoint, keys: sanitize(keys) }, { upsert: true, new: true });
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post('/api/push/unsubscribe', auth, async (req, res) => {
+  try { await Subscription.findOneAndDelete({ endpoint: req.body.endpoint }); res.json({ ok: true }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// Отправка уведомлений пользователю
+async function sendPush(userId, title, body) {
+  if (!process.env.VAPID_PRIVATE_KEY) return;
+  const subs = await Subscription.find({ userId });
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify({ title, body }));
+    } catch (e) {
+      if (e.statusCode === 410) await Subscription.deleteOne({ _id: sub._id }); // подписка устарела
+    }
+  }
+}
+
+// Планировщик: проверка каждый час
+setInterval(async () => {
+  if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const time = now.toTimeString().slice(0, 5);
+  try {
+    const settings = await Setting.find({});
+    for (const s of settings) {
+      const notifs = s.value?.notifications || [];
+      for (const n of notifs) {
+        if (!n.active || n.time !== time) continue;
+        // Проверка: сегодня уже отправляли?
+        if (n.lastSent === today) continue;
+        let shouldSend = false;
+        let title = 'Moje Media';
+        let body = '';
+        if (n.type === 'reading' && n.day === now.getDate()) {
+          const month = now.toISOString().slice(0, 7);
+          const entry = await Entry.findOne({ userId: s.userId, apartmentId: s.value.activeApartmentId || 'a1', month });
+          if (!entry) { shouldSend = true; body = 'Nie zapomnij wpisać wskazań wody!'; }
+        }
+        if (n.type === 'payment' && n.day === now.getDate()) {
+          const month = now.toISOString().slice(0, 7);
+          const entry = await Entry.findOne({ userId: s.userId, apartmentId: s.value.activeApartmentId || 'a1', month });
+          if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
+        }
+        if (shouldSend) {
+          await sendPush(s.userId, title, body);
+          n.lastSent = today;
+          await s.save();
+        }
+      }
+    }
+  } catch (e) { console.error('Push scheduler error:', e.message); }
+}, 60 * 60 * 1000); // каждый час
 
 if (process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI).then(() => console.log('MongoDB connected')).catch(err => console.error('MongoDB connection error:', err.message));
 else console.warn('MONGODB_URI is not set. API runs, but persistent data is unavailable.');

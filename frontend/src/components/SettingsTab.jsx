@@ -2,6 +2,7 @@ import { Home, LogOut, Moon, Plus, Settings, Sun, Trash2, WalletCards } from 'lu
 import { LABELS } from '../constants';
 import { money, num } from '../utils';
 import { Field } from './common';
+import { NotificationsSection } from './NotificationsSection';
 
 const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 
@@ -132,6 +133,8 @@ export function SettingsTab({
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
       </section>
+
+      <NotificationsSection settings={settings} setSettings={setSettings} onSaveSettings={onSaveSettings} />
 
       <section className="card">
         <div className="cardHead">

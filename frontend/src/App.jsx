@@ -76,6 +76,31 @@ export default function App() {
     })();
   }, [auth]);
 
+  // Подписка на push при первой загрузке (если разрешено)
+  useEffect(() => {
+    if (!API || !auth || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    (async () => {
+      try {
+        const { key } = await apiGet('/api/push/vapid-key');
+        if (!key) return;
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+          await apiPost('/api/push/subscribe', newSub.toJSON());
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [auth]);
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+
   const logout = () => { localStorage.removeItem('mb-token'); setAuth(null); };
 
   const switchApartment = id => {
