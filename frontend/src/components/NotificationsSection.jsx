@@ -13,13 +13,23 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
   const [newDay, setNewDay] = useState('25');
   const [newTime, setNewTime] = useState('18:00');
 
-  const addNotif = () => {
-    const id = `n${Date.now()}`;
-    setSettings({ notifications: [...(settings.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }] });
+  const save = async (updatedApt) => {
+    try { await onSaveSettings({ ...allSettings, apartments: allSettings.apartments.map(a => a.id === activeApartmentId ? updatedApt : a) }); } catch { /* ignore */ }
   };
 
-  const updateNotif = (id, patch) => {
-    setSettings({ notifications: (settings.notifications || []).map(n => n.id === id ? { ...n, ...patch } : n) });
+  const addNotif = async () => {
+    const id = `n${Date.now()}`;
+    const next = [...(settings.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }];
+    const updatedApt = { ...settings, notifications: next };
+    setSettings({ notifications: next });
+    await save(updatedApt);
+  };
+
+  const updateNotif = async (id, patch) => {
+    const next = (settings.notifications || []).map(n => n.id === id ? { ...n, ...patch } : n);
+    const updatedApt = { ...settings, notifications: next };
+    setSettings({ notifications: next });
+    await save(updatedApt);
   };
 
   const removeNotif = async id => {
@@ -27,7 +37,7 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
     const next = (settings.notifications || []).filter(n => n.id !== id);
     const updatedApt = { ...settings, notifications: next };
     setSettings({ notifications: next });
-    try { await onSaveSettings({ ...allSettings, apartments: allSettings.apartments.map(a => a.id === activeApartmentId ? updatedApt : a) }); } catch { /* ignore */ }
+    await save(updatedApt);
   };
 
   const requestPermission = async () => {
