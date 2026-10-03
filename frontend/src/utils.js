@@ -29,7 +29,7 @@ export const calc = (water, prev, settings, tariffs) => {
 };
 
 // EPC069-12 QR payload — сканируется любым банковским приложением (Erste George, mBank, PKO...)
-export const epcQrPayload = ({ name, iban, amount, note }) => {
+export const epcQrPayload = ({ name, iban, amount, note, currency = 'EUR' }) => {
   const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim().slice(0, 70);
   const ibanClean = String(iban || '').replace(/\s/g, '').toUpperCase();
   const amt = Number(amount || 0).toFixed(2);
@@ -41,7 +41,7 @@ export const epcQrPayload = ({ name, iban, amount, note }) => {
     '',          // BIC (необязателен в SEPA)
     clean(name),
     ibanClean,
-    `EUR${amt}`,
+    `${currency}${amt}`,
     '',          // Purpose
     '',          // Structured reference
     clean(note)  // Remittance info (unstructured)

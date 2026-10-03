@@ -28,6 +28,12 @@ export function SettingsTab({
           <Field label="Odbiorca (nazwa)" value={settings.payeeName} onChange={v => setSettings({ ...settings, payeeName: v })} />
           <Field label="IBAN odbiorcy" value={settings.payeeIban} onChange={v => setSettings({ ...settings, payeeIban: v.replace(/\s/g, '').toUpperCase() })} />
           <Field label="Tytuł przelewu (opcjonalnie)" value={settings.paymentNote} onChange={v => setSettings({ ...settings, paymentNote: v })} />
+          <label>Waluta przelewu
+            <select value={settings.paymentCurrency || 'EUR'} onChange={e => setSettings({ ...settings, paymentCurrency: e.target.value })}>
+              <option value="EUR">EUR (Austria / SEPA)</option>
+              <option value="PLN">PLN (Polska)</option>
+            </select>
+          </label>
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
       </section>

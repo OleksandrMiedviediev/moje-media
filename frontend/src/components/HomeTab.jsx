@@ -8,7 +8,7 @@ function PayQrModal({ settings, total, month, onClose }) {
   const [qr, setQr] = useState('');
   useEffect(() => {
     const note = settings.paymentNote || `Media ${settings.apartment} ${month}`;
-    QRCode.toDataURL(epcQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note }), { width: 260, margin: 1 })
+    QRCode.toDataURL(epcQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note, currency: settings.paymentCurrency || 'EUR' }), { width: 260, margin: 1 })
       .then(setQr).catch(() => setQr(''));
   }, [settings, total, month]);
   return (
