@@ -26,7 +26,7 @@ export function SettingsTab({
     if (!confirm(`Usunąć „${item?.name || 'pozycję'}”? Stare miesiące zachowają tę pozycję w historii.`)) return;
     const next = items.filter(i => i.id !== id);
     setSettings({ customItems: next });
-    try { await onSaveSettings({ ...settings, customItems: next }); } catch { /* ignore */ }
+    try { await onSaveSettings(); } catch { /* ignore */ }
   };
 
   // Валидация: название обязательно, числа >= 0
