@@ -7,7 +7,7 @@ const NOTIF_TYPES = [
   { id: 'payment', name: 'Do zapłaty' }
 ];
 
-export function NotificationsSection({ settings, setSettings, onSaveSettings }) {
+export function NotificationsSection({ settings, setSettings, onSaveSettings, allSettings, activeApartmentId }) {
   const notifs = settings.notifications || [];
   const [newType, setNewType] = useState('reading');
   const [newDay, setNewDay] = useState('25');
@@ -25,8 +25,9 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings }) 
   const removeNotif = async id => {
     if (!confirm('Usunąć przypomnienie?')) return;
     const next = (settings.notifications || []).filter(n => n.id !== id);
+    const updatedApt = { ...settings, notifications: next };
     setSettings({ notifications: next });
-    try { await onSaveSettings({ ...settings, notifications: next }); } catch { /* ignore */ }
+    try { await onSaveSettings({ ...allSettings, apartments: allSettings.apartments.map(a => a.id === activeApartmentId ? updatedApt : a) }); } catch { /* ignore */ }
   };
 
   const requestPermission = async () => {
