@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   verified: { type: Boolean, default: false },
   verifyToken: { type: String, default: null },
+  resetToken: { type: String, default: null },
+  resetTokenExpires: { type: Date, default: null },
   onboarded: { type: Boolean, default: false }
 }, { timestamps: true });
 const tariffSchema = new mongoose.Schema({
@@ -95,6 +97,22 @@ async function sendVerificationEmail(email, token) {
   });
 }
 
+async function sendPasswordResetEmail(email, token) {
+  const baseUrl = allowed[0] === '*' || !allowed[0] ? 'http://localhost:5173' : allowed[0];
+  const link = `${baseUrl}/?reset=${token}`;
+  const text = `Witaj!\n\nOtrzymaliśmy prośbę o zresetowanie hasła. Kliknij w link (ważny 1 godzinę):\n${link}\n\nJeśli to nie Ty prosiłeś o reset, zignoruj tę wiadomość — hasło pozostanie bez zmian.`;
+  if (!mailer) {
+    console.log(`[DEV] Password reset link for ${email}: ${link}`);
+    return;
+  }
+  await mailer.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: email,
+    subject: 'Moje Media — reset hasła',
+    text
+  });
+}
+
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 app.post('/api/auth/register', async (req, res) => {
@@ -134,6 +152,36 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       catch (e) { console.error('Email send error:', e.message); }
     }
     res.json({ ok: true, message: 'Jeśli konto istnieje, wysłaliśmy nowy link' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    const user = await User.findOne({ email });
+    if (user) {
+      user.resetToken = crypto.randomBytes(32).toString('hex');
+      user.resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+      try { await sendPasswordResetEmail(email, user.resetToken); }
+      catch (e) { console.error('Email send error:', e.message); }
+    }
+    res.json({ ok: true, message: 'Jeśli konto istnieje, wysłaliśmy link do resetu hasła' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const token = String(req.body.token || '');
+    const password = String(req.body.password || '');
+    if (password.length < 6) return res.status(400).json({ error: 'Hasło musi mieć min. 6 znaków' });
+    const user = await User.findOne({ resetToken: token, resetTokenExpires: { $gt: new Date() } });
+    if (!user) return res.status(400).json({ error: 'Link jest nieprawidłowy lub wygasł' });
+    user.passwordHash = await bcrypt.hash(password, 10);
+    user.resetToken = null;
+    user.resetTokenExpires = null;
+    await user.save();
+    res.json({ ok: true, message: 'Hasło zmienione. Możesz się zalogować.' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

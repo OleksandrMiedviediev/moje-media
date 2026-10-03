@@ -99,12 +99,13 @@ function App(){
   </div>
 }
 function AuthScreen({onAuth}){
-  const [mode,setMode]=useState('login');
+  const [mode,setMode]=useState(()=>new URLSearchParams(window.location.search).get('reset')?'reset':'login');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [msg,setMsg]=useState('');
   const [err,setErr]=useState('');
   const [verifyToken]=useState(()=>new URLSearchParams(window.location.search).get('verify'));
+  const [resetToken]=useState(()=>new URLSearchParams(window.location.search).get('reset'));
   useEffect(()=>{if(!verifyToken)return;apiGet(`/api/auth/verify?token=${verifyToken}`).then(r=>{setMsg(r.message);window.history.replaceState({},'',window.location.pathname);}).catch(e=>setErr(e.response?.data?.error||'Błąd potwierdzenia'));},[verifyToken]);
   const submit=async e=>{
     e.preventDefault();setErr('');setMsg('');
@@ -112,6 +113,14 @@ function AuthScreen({onAuth}){
       if(mode==='register'){
         const res=await axios.post(`${API}/api/auth/register`,{email,password});
         setMsg(res.data.devLink?`DEV: otwórz ${res.data.devLink}`:res.data.message);
+      }else if(mode==='forgot'){
+        const res=await axios.post(`${API}/api/auth/forgot-password`,{email});
+        setMsg(res.data.message);
+      }else if(mode==='reset'){
+        const res=await axios.post(`${API}/api/auth/reset-password`,{token:resetToken,password});
+        setMsg(res.data.message);
+        window.history.replaceState({},'',window.location.pathname);
+        setMode('login');setPassword('');
       }else{
         const res=await axios.post(`${API}/api/auth/login`,{email,password});
         localStorage.setItem('mb-token',res.data.token);
@@ -120,7 +129,9 @@ function AuthScreen({onAuth}){
     }catch(e2){setErr(e2.response?.data?.error||'Błąd połączenia z serwerem');}
   };
   const resend=async()=>{setErr('');setMsg('');try{const res=await axios.post(`${API}/api/auth/resend-verification`,{email});setMsg(res.data.message);}catch{setErr('Błąd połączenia');}};
-  return <div className="app authApp"><div className="authCard card"><div className="eyebrow">DOMOWE MEDIA</div><h1>Moje Media</h1><p className="authSub">Domowe rozliczenia mediów — woda, ścieki, opłaty stałe.</p><form onSubmit={submit}><label>Adres e-mail<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="jan@example.com"/></label><label>Hasło<input type="password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} placeholder="min. 6 znaków"/></label>{err&&<div className="authErr">{err}{err.includes('Potwierdź')&&<button type="button" className="link" onClick={resend}>Wyślij link ponownie</button>}</div>}{msg&&<div className="authOk">{msg}</div>}<button className="primary" type="submit">{mode==='login'?'Zaloguj się':'Załóż konto'}</button></form><button className="link" onClick={()=>{setMode(mode==='login'?'register':'login');setErr('');setMsg('');}}>{mode==='login'?'Nie masz konta? Zarejestruj się':'Masz już konto? Zaloguj się'}</button></div></div>;
+  const title=mode==='forgot'?'Reset hasła':mode==='reset'?'Nowe hasło':mode==='register'?'Rejestracja':'Moje Media';
+  const sub=mode==='forgot'?'Podaj e-mail — wyślemy link do resetu hasła.':mode==='reset'?'Wpisz nowe hasło do swojego konta.':mode==='register'?'Załóż konto, aby rozliczać swoje media.':'Domowe rozliczenia mediów — woda, ścieki, opłaty stałe.';
+  return <div className="app authApp"><div className="authCard card"><div className="eyebrow">DOMOWE MEDIA</div><h1>{title}</h1><p className="authSub">{sub}</p><form onSubmit={submit}>{mode!=='reset'&&<label>Adres e-mail<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="jan@example.com"/></label>}{mode!=='forgot'&&<label>{mode==='reset'?'Nowe hasło':'Hasło'}<input type="password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} placeholder="min. 6 znaków"/></label>}{err&&<div className="authErr">{err}{err.includes('Potwierdź')&&<button type="button" className="link" onClick={resend}>Wyślij link ponownie</button>}</div>}{msg&&<div className="authOk">{msg}</div>}<button className="primary" type="submit">{mode==='login'?'Zaloguj się':mode==='register'?'Załóż konto':mode==='forgot'?'Wyślij link':'Zapisz nowe hasło'}</button></form>{mode==='login'&&<button className="link" onClick={()=>{setMode('forgot');setErr('');setMsg('');}}>Nie pamiętasz hasła?</button>}<button className="link" onClick={()=>{setMode(mode==='register'?'login':'register');setErr('');setMsg('');}}>{mode==='register'?'Masz już konto? Zaloguj się':mode==='login'?'Nie masz konta? Zarejestruj się':'Wróć do logowania'}</button></div></div>;
 }
 function OnboardingScreen({onDone}){
   const [apartment,setApartment]=useState('');
