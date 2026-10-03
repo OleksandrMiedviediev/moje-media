@@ -21,3 +21,6 @@
 .chartTabs{display:flex;gap:4px;background:#eef1f6;border-radius:10px;padding:3px}
 .chartTabs button{border:0;background:transparent;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#7a8597;cursor:pointer;font-family:inherit}
 .chartTabs button.active{background:#fff;color:#172033;box-shadow:0 1px 4px #15233a14}
+input{width:100%;max-width:100%;min-width:0}
+input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
+@supports (-webkit-appearance:none){input[type="month"]::-webkit-date-and-time-value{text-align:left}}
