@@ -10,7 +10,13 @@ import { SettingsTab } from './components/SettingsTab';
 
 // Миграция: старые settings → apartments[]
 const migrateSettings = s => {
-  if (s.apartments) return s; // notifications теперь внутри каждого apartment
+  if (s.apartments) {
+    // Если notifications на верхнем уровне (старая структура) — перенести в первый apartment
+    if (s.notifications && s.notifications.length && !s.apartments[0]?.notifications) {
+      return { ...s, apartments: s.apartments.map((a, i) => i === 0 ? { ...a, notifications: s.notifications } : a), notifications: undefined };
+    }
+    return s;
+  }
   const apt = {
     id: 'a1',
     name: s.apartment || 'Mieszkanie',
