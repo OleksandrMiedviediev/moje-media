@@ -27,24 +27,26 @@ export function PayQrModal({ settings, total, month, onClose }) {
 
 export function HomeTab({
   month, setMonth, water, setWater, editing, setEditing,
-  previousWater, settings, selectedTariff, onSave
+  previousWater, settings, selectedTariff, onSave, lastSavedTotal, lastSavedMonth
 }) {
   const result = calc(water, previousWater, settings, selectedTariff);
   const [showQr, setShowQr] = useState(false);
-  const canPay = settings.payeeIban && settings.payeeName && result.total > 0;
+  const justSaved = lastSavedMonth === month && !water && !editing;
+  const displayTotal = justSaved ? lastSavedTotal : result.total;
+  const canPay = settings.payeeIban && settings.payeeName && displayTotal > 0;
 
   return (
     <>
       <section className="hero card">
         <div>
           <span>DO ZAPŁATY</span>
-          <strong>{money(result.total)}</strong>
-          <small>{monthLabel(month)}</small>
+          <strong>{money(displayTotal)}</strong>
+          <small>{monthLabel(month)}{justSaved && ' · zapisane ✓'}</small>
         </div>
         <div className="heroIcon"><WalletCards size={28} /></div>
       </section>
       {canPay && <button className="primary payBtn" onClick={() => setShowQr(true)}><QrCode size={18} />Zapłać — pokaż kod QR</button>}
-      {showQr && <PayQrModal settings={settings} total={result.total} month={month} onClose={() => setShowQr(false)} />}
+      {showQr && <PayQrModal settings={settings} total={displayTotal} month={month} onClose={() => setShowQr(false)} />}
 
       <section className="card">
         <div className="cardHead">
