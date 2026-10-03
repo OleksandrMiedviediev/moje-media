@@ -48,3 +48,10 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .qrImg{display:block;width:100%;max-width:260px;margin:12px auto;border-radius:12px;border:1px solid #e5e9f0}
 .grid select,.filters select{border:1px solid #e2e7ef;border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;background:#f9fafc;width:100%;color:#172033}
 .qrMonth{display:block;text-align:center;margin-top:8px;color:#7a8597;font-size:13px}
+.customItem{border:1px solid #e5e9f0;border-radius:14px;padding:14px;margin-bottom:12px;background:#fafbfd}
+.customHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.badge{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
+.badge.meter{background:#eef4ff;color:#356ae6}
+.badge.fixed{background:#f0fdf4;color:#15803d}
+.danger{color:#b91c1c}
+button:disabled{opacity:.5;cursor:not-allowed}

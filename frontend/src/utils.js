@@ -6,7 +6,7 @@ export const monthNow = () => new Date().toISOString().slice(0, 7);
 
 export const monthLabel = m => new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(new Date(`${m}-01T00:00:00`));
 
-export const calc = (water, prev, settings, tariffs) => {
+export const calc = (water, prev, settings, tariffs, customReadings = {}) => {
   const usage = Math.max(0, num(water) - num(prev));
   const variable = usage * (num(tariffs.coldWater) + num(tariffs.sewage));
   const fixed = num(tariffs.wastePerPerson) * num(settings.residents)
@@ -25,7 +25,27 @@ export const calc = (water, prev, settings, tariffs) => {
     light: num(tariffs.stairLightPerPerson) * num(settings.residents),
     renovation: num(tariffs.renovationPerM2) * num(settings.area)
   };
-  return { usage, variable, fixed, total: variable + fixed, breakdown };
+
+  // Кастомные позиции: счётчики (meter) и фиксированные оплаты (fixed)
+  const custom = {};
+  let customTotal = 0;
+  (settings.customItems || []).forEach(item => {
+    if (!item.active) return;
+    if (item.type === 'meter') {
+      const curr = num(customReadings[item.id]);
+      const prevVal = num(item.lastValue);
+      const itemUsage = Math.max(0, curr - prevVal);
+      const cost = itemUsage * num(item.rate);
+      custom[item.id] = { usage: itemUsage, cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    } else {
+      const cost = num(item.amount);
+      custom[item.id] = { cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    }
+  });
+
+  return { usage, variable, fixed, total: variable + fixed + customTotal, breakdown, custom, customTotal };
 };
 
 // Польский стандарт ZBP (płatność QR) — PKO, mBank, ING PL, Santander, Erste PL...

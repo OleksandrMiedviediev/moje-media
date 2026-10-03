@@ -27,14 +27,29 @@ export function PayQrModal({ settings, total, month, onClose }) {
 
 export function HomeTab({
   month, setMonth, water, setWater, editing, setEditing,
-  previousWater, settings, selectedTariff, onSave, savedEntry
+  previousWater, settings, selectedTariff, onSave, savedEntry, customReadings, setCustomReadings
 }) {
-  const result = calc(water, previousWater, settings, selectedTariff);
+  const result = calc(water, previousWater, settings, selectedTariff, customReadings);
   const [showQr, setShowQr] = useState(false);
+  const meters = (settings.customItems || []).filter(i => i.active && i.type === 'meter');
   // После сохранения (поле пустое, не в режиме редактирования) — показываем сохранённую сумму
   const justSaved = savedEntry && !water && !editing;
   const displayTotal = justSaved ? num(savedEntry.total) : result.total;
   const canPay = settings.payeeIban && settings.payeeName && displayTotal > 0;
+
+  // Валидация: вода — число >= предыдущего; счётчики — число >= lastValue
+  const validate = () => {
+    if (!water.trim()) return 'Wpisz aktualne wskazanie wody.';
+    if (isNaN(num(water))) return 'Wskazanie wody musi być liczbą.';
+    if (num(water) < num(previousWater)) return `Wskazanie nie może być mniejsze niż poprzednie (${num(previousWater).toFixed(2)}).`;
+    for (const m of meters) {
+      const v = customReadings[m.id];
+      if (v !== undefined && v !== '' && isNaN(num(v))) return `„${m.name}” musi być liczbą.`;
+      if (v !== undefined && v !== '' && num(v) < num(m.lastValue)) return `„${m.name}” nie może być mniejsze niż poprzedni stan (${num(m.lastValue).toFixed(2)}).`;
+    }
+    return null;
+  };
+  const validationError = validate();
 
   return (
     <>
@@ -65,6 +80,24 @@ export function HomeTab({
         {editing && <div className="editNotice">Edytujesz {monthLabel(month)}. Po zapisaniu stare wyliczenie zostanie zastąpione.</div>}
       </section>
 
+      {meters.length > 0 && (
+        <section className="card">
+          <h2>Pozostałe liczniki</h2>
+          <div className="waterGrid">
+            {meters.map(m => (
+              <label key={m.id}>{m.name || 'Licznik'} ({m.unit})
+                <input
+                  inputMode="decimal"
+                  value={customReadings[m.id] ?? ''}
+                  onChange={e => setCustomReadings({ ...customReadings, [m.id]: e.target.value })}
+                  placeholder={`poprz. ${num(m.lastValue).toFixed(2)}`}
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="card">
         <h2>Rozliczenie</h2>
         <div className="rows">
@@ -77,16 +110,21 @@ export function HomeTab({
           <Row name="Sprzątanie klatek" value={result.breakdown.cleaning} />
           <Row name="Światło klatki" value={result.breakdown.light} />
           <Row name="Fundusz remontowy" value={result.breakdown.renovation} />
+          {Object.values(result.custom).length > 0 && <div className="separator" />}
+          {Object.entries(result.custom).map(([id, c]) => (
+            <Row key={id} name={c.name + (c.usage !== undefined ? ` (${c.usage.toFixed(2).replace('.', ',')} ${c.unit})` : '')} value={c.cost} />
+          ))}
         </div>
         <div className="grand"><span>RAZEM</span><b>{money(result.total)}</b></div>
       </section>
 
-      <button className="primary" onClick={() => onSave(result)}>{editing ? 'Zapisz zmiany' : 'Zapisz miesiąc'}</button>
+      {validationError && <div className="authErr" style={{ margin: '0 14px 10px' }}>{validationError}</div>}
+      <button className="primary" onClick={() => onSave(result)} disabled={!!validationError}>{editing ? 'Zapisz zmiany' : 'Zapisz miesiąc'}</button>
     </>
   );
 }
 
-export function entryPayload(month, previousWater, water, result, selectedTariff) {
+export function entryPayload(month, previousWater, water, result, selectedTariff, customReadings = {}) {
   return {
     month,
     previousWater: num(previousWater),

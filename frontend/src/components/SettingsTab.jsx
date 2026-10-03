@@ -1,12 +1,47 @@
-import { Home, LogOut, Plus, Settings, WalletCards } from 'lucide-react';
+import { Home, LogOut, Plus, Settings, Trash2, WalletCards } from 'lucide-react';
 import { LABELS } from '../constants';
 import { money, num } from '../utils';
 import { Field } from './common';
+
+const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 
 export function SettingsTab({
   settings, setSettings, tariffs, tariffMonth, setTariffMonth,
   activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onLogout
 }) {
+  const items = settings.customItems || [];
+
+  const addItem = type => {
+    const id = `c${Date.now()}`;
+    setSettings({
+      ...settings,
+      customItems: [...items, { id, type, name: '', unit: 'm³', rate: 0, amount: 0, active: true, lastValue: 0 }]
+    });
+  };
+
+  const updateItem = (id, patch) => {
+    setSettings({
+      ...settings,
+      customItems: items.map(i => i.id === id ? { ...i, ...patch } : i)
+    });
+  };
+
+  const removeItem = id => {
+    setSettings({ ...settings, customItems: items.filter(i => i.id !== id) });
+  };
+
+  // Валидация: название обязательно, числа >= 0
+  const validateItems = () => {
+    for (const item of items) {
+      if (!item.active) continue;
+      if (!item.name || !item.name.trim()) return `Podaj nazwę pozycji (${item.type === 'meter' ? 'licznik' : 'stała opłata'})`;
+      if (item.type === 'meter' && num(item.rate) < 0) return `Stawka „${item.name}” nie może być ujemna`;
+      if (item.type === 'fixed' && num(item.amount) < 0) return `Kwota „${item.name}” nie może być ujemna`;
+    }
+    return null;
+  };
+  const itemsError = validateItems();
+
   return (
     <>
       <section className="card">
@@ -19,6 +54,43 @@ export function SettingsTab({
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
         <button className="secondary logout" onClick={onLogout}><LogOut size={16} />Wyloguj się</button>
+      </section>
+
+      <section className="card">
+        <div className="cardHead">
+          <div><h2><Plus />Dodatkowe pozycje</h2><p>Liczniki (ciepła woda, gaz, prąd…) lub stałe opłaty (internet, TV…).</p></div>
+        </div>
+        {items.length === 0 && <p className="authSub" style={{ margin: '8px 0 12px' }}>Brak dodatkowych pozycji. Dodaj licznik lub stałą opłatę.</p>}
+        {items.map(item => (
+          <div className="customItem" key={item.id}>
+            <div className="customHead">
+              <span className={`badge ${item.type}`}>{item.type === 'meter' ? 'Licznik' : 'Stała'}</span>
+              <button className="eye danger" onClick={() => removeItem(item.id)}><Trash2 size={15} /></button>
+            </div>
+            <div className="grid">
+              <Field label="Nazwa" value={item.name} onChange={v => updateItem(item.id, { name: v })} />
+              <label>Jednostka
+                <select value={item.unit} onChange={e => updateItem(item.id, { unit: e.target.value })}>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </label>
+              {item.type === 'meter' ? (
+                <>
+                  <Field label="Stawka zł/jedn." value={item.rate} type="number" step="0.01" onChange={v => updateItem(item.id, { rate: num(v) })} />
+                  <Field label="Poprzedni stan" value={item.lastValue} type="number" step="0.01" onChange={v => updateItem(item.id, { lastValue: num(v) })} />
+                </>
+              ) : (
+                <Field label="Kwota zł/mies." value={item.amount} type="number" step="0.01" onChange={v => updateItem(item.id, { amount: num(v) })} />
+              )}
+            </div>
+          </div>
+        ))}
+        <div className="filters">
+          <button className="secondary" onClick={() => addItem('meter')}><Plus size={15} /> Licznik</button>
+          <button className="secondary" onClick={() => addItem('fixed')}><Plus size={15} /> Stała opłata</button>
+        </div>
+        {itemsError && <div className="authErr">{itemsError}</div>}
+        <button className="secondary" onClick={onSaveSettings} disabled={!!itemsError}>Zapisz dane</button>
       </section>
 
       <section className="card">

@@ -4,16 +4,40 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import 'dotenv/config';
 
 mongoose.set('bufferCommands', false);
 
+// Защита от NoSQL-инъекций: удаляет ключи, начинающиеся с $ или содержащие .
+const sanitize = obj => {
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.startsWith('$') || k.includes('.')) continue;
+      out[k] = sanitize(v);
+    }
+    return out;
+  }
+  return obj;
+};
+
 const app = express();
+app.set('trust proxy', 1); // за Render/Vercel прокси — для корректного IP в rate-limit
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const allowed = (process.env.FRONTEND_URL || '*').split(',').map(s => s.trim());
+app.use(helmet());
 app.use(cors({ origin: allowed.includes('*') ? true : allowed }));
 app.use(express.json({ limit: '100kb' }));
+
+// Rate limiting: auth-роуты строже (брутфорс паролей/спам писем)
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, message: { error: 'Za dużo prób. Spróbuj za 15 minut.' } });
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'Za dużo żądań. Zwolnij.' } });
+app.use('/api/auth/', authLimiter);
+app.use('/api/', apiLimiter);
 
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -104,6 +128,22 @@ async function sendPasswordResetEmail(email, token) {
 }
 
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const isMonth = m => /^\d{4}-\d{2}$/.test(m);
+const isNum = v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) < 1e9;
+const isShortStr = (v, max = 200) => typeof v === 'string' && v.length <= max;
+
+// Whitelist полей записи месяца — только эти поля сохраняются
+const ENTRY_FIELDS = ['month', 'previousWater', 'currentWater', 'usage', 'total', 'breakdown', 'tariffs', 'note', 'custom', 'customReadings'];
+const pickEntry = body => {
+  const out = {};
+  for (const k of ENTRY_FIELDS) if (k in body) out[k] = sanitize(body[k]);
+  for (const k of ['previousWater', 'currentWater', 'usage', 'total']) {
+    if (k in out && !isNum(out[k])) delete out[k];
+  }
+  if ('month' in out && !isMonth(out.month)) delete out.month;
+  if ('note' in out && !isShortStr(out.note, 500)) delete out.note;
+  return out;
+};
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -194,10 +234,10 @@ app.get('/api/auth/me', auth, (req, res) => {
 app.post('/api/auth/onboarding', auth, async (req, res) => {
   try {
     const { apartment, area, residents } = req.body;
-    if (!apartment || !String(apartment).trim()) return res.status(400).json({ error: 'Podaj adres / nazwę mieszkania' });
-    if (!(Number(area) > 0)) return res.status(400).json({ error: 'Podaj powierzchnię w m²' });
-    if (!(Number(residents) >= 1)) return res.status(400).json({ error: 'Podaj liczbę mieszkańców' });
-    const value = { ...defaultSettings, apartment: String(apartment).trim(), area: Number(area), residents: Number(residents) };
+    if (!isShortStr(apartment, 120) || !apartment.trim()) return res.status(400).json({ error: 'Podaj adres / nazwę mieszkania' });
+    if (!isNum(area) || Number(area) === 0) return res.status(400).json({ error: 'Podaj powierzchnię w m²' });
+    if (!isNum(residents) || Number(residents) < 1) return res.status(400).json({ error: 'Podaj liczbę mieszkańców' });
+    const value = { ...defaultSettings, apartment: apartment.trim(), area: Number(area), residents: Number(residents) };
     await Setting.findOneAndUpdate({ userId: req.user._id }, { value }, { upsert: true, new: true });
     const hasTariffs = await Tariff.exists({ userId: req.user._id });
     if (!hasTariffs) await Tariff.create({ userId: req.user._id, effectiveFrom: '2026-01', values: defaultTariffs });
@@ -217,7 +257,7 @@ app.get('/api/settings', auth, async (req, res) => {
 });
 app.put('/api/settings', auth, async (req, res) => {
   try {
-    const doc = await Setting.findOneAndUpdate({ userId: req.user._id }, { value: req.body }, { upsert: true, new: true });
+    const doc = await Setting.findOneAndUpdate({ userId: req.user._id }, { value: sanitize(req.body) }, { upsert: true, new: true });
     res.json(doc.value);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -229,21 +269,24 @@ app.get('/api/tariffs', auth, async (req, res) => {
 });
 app.put('/api/tariffs', auth, async (req, res) => {
   try {
-    if (!/^\d{4}-\d{2}$/.test(req.body.effectiveFrom)) return res.status(400).json({ error: 'effectiveFrom must be YYYY-MM' });
+    if (!isMonth(req.body.effectiveFrom)) return res.status(400).json({ error: 'effectiveFrom must be YYYY-MM' });
+    const values = sanitize(req.body.values || {});
+    for (const v of Object.values(values)) if (!isNum(v)) return res.status(400).json({ error: 'Wartości taryf muszą być liczbami' });
     const doc = await Tariff.findOneAndUpdate(
       { userId: req.user._id, effectiveFrom: req.body.effectiveFrom },
-      { values: req.body.values },
+      { values },
       { upsert: true, new: true }
     );
     res.json(doc);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
-app.delete('/api/tariffs/:id', auth, async (req, res) => { try { await Tariff.findOneAndDelete({ _id: req.params.id, userId: req.user._id }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
+app.delete('/api/tariffs/:id', auth, async (req, res) => { try { if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Złe id' }); await Tariff.findOneAndDelete({ _id: req.params.id, userId: req.user._id }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
 app.get('/api/entries', auth, async (req, res) => { try { res.json(await Entry.find({ userId: req.user._id }).sort({ month: -1 })); } catch (e) { res.status(500).json({ error: e.message }); } });
 app.put('/api/entries/:month', auth, async (req, res) => {
   try {
-    const body = { ...req.body };
-    delete body.userId;
+    if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+    const body = pickEntry(req.body);
+    if (!Object.keys(body).length) return res.status(400).json({ error: 'Brak danych' });
     const doc = await Entry.findOneAndUpdate(
       { userId: req.user._id, month: req.params.month },
       body,
@@ -252,7 +295,7 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     res.json(doc);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
-app.delete('/api/entries/:month', auth, async (req, res) => { try { await Entry.findOneAndDelete({ userId: req.user._id, month: req.params.month }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
+app.delete('/api/entries/:month', auth, async (req, res) => { try { if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' }); await Entry.findOneAndDelete({ userId: req.user._id, month: req.params.month }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
 
 if (process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI).then(() => console.log('MongoDB connected')).catch(err => console.error('MongoDB connection error:', err.message));
 else console.warn('MONGODB_URI is not set. API runs, but persistent data is unavailable.');

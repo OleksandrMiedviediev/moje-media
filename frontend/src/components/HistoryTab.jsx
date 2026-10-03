@@ -129,6 +129,10 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
                     <Row name="Sprzątanie klatek" value={e.breakdown?.cleaning} />
                     <Row name="Światło klatki" value={e.breakdown?.light} />
                     <Row name="Fundusz remontowy" value={e.breakdown?.renovation} />
+                    {e.custom && Object.keys(e.custom).length > 0 && <div className="separator" />}
+                    {e.custom && Object.entries(e.custom).map(([id, c]) => (
+                      <Row key={id} name={c.name + (c.usage !== undefined ? ` (${c.usage.toFixed(2).replace('.', ',')} ${c.unit})` : '')} value={c.cost} />
+                    ))}
                       <div className="actions">
                         <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
                         {canPay && <button onClick={() => setPayFor(e)}><QrCode size={16} />Zapłać</button>}

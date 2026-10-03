@@ -9,18 +9,21 @@ Aplikacja do domowych rozliczeń mediów: woda, ścieki i opłaty stałe. Rejest
 ## ✨ Funkcje
 
 ### 🔐 Konto użytkownika
+
 - rejestracja e-mail + hasło z potwierdzeniem adresu (link na mail);
 - logowanie, reset hasła przez e-mail;
 - onboarding: adres, powierzchnia, liczba mieszkańców — przy pierwszym logowaniu;
 - wszystkie dane prywatne — każdy widzi tylko swoje mieszkanie.
 
 ### 📊 Bieżące rozliczenie
+
 - wpisujesz tylko **aktualne wskazanie wody** — zużycie i suma liczą się automatycznie;
 - rozbicie: zimna woda, ścieki, śmieci, konserwacja, administracja, sprzątanie, światło klatki, fundusz remontowy;
 - taryfy z datą obowiązywania — zmiana stawek nie rusza starych miesięcy;
 - po zapisie suma pozostaje widoczna (nie przelicza się z pustego pola).
 
 ### 📈 Historia
+
 - lista miesięcy z filtrami po roku i paginacją (5/10/20/50 na stronę);
 - wykres zużycia z przewijaniem poziomym: miesiące lub suma roczna;
 - pod każdym słupkiem kwota do zapłaty;
@@ -29,11 +32,13 @@ Aplikacja do domowych rozliczeń mediów: woda, ścieki i opłaty stałe. Rejest
 - edycja, usunięcie, płatność dowolnego miesiąca.
 
 ### 💳 Płatność QR
+
 - kod QR w polskim standardzie **ZBP** — skanujesz w aplikacji banku (PKO, mBank, ING, Santander, Erste PL…);
 - automatycznie wypełnia: numer konta, NIP odbiorcy, kwotę, tytuł przelewu;
 - przycisk „Zapłać” przy bieżącym miesiącu i przy każdym miesiącu w historii.
 
 ### 💾 Zapamiętywanie
+
 - aktywna zakładka, filtry i rozmiar strony zachowują się po odświeżeniu;
 - fallback lokalny (localStorage), gdy API niedostępne.
 
@@ -69,13 +74,13 @@ Otwórz http://localhost:5173 → zarejestruj się → potwierdź e-mail → pod
 2. Build: `npm install` · Start: `npm start`
 3. Environment Variables:
 
-| Key | Value |
-|---|---|
-| `MONGODB_URI` | `mongodb+srv://user:pass@cluster.mongodb.net/media-billing` |
-| `FRONTEND_URL` | `https://twoja-apka.vercel.app` |
-| `JWT_SECRET` | losowy ciąg (`openssl rand -hex 32`) |
+| Key             | Value                                                                    |
+| --------------- | ------------------------------------------------------------------------ |
+| `MONGODB_URI`   | `mongodb+srv://user:pass@cluster.mongodb.net/media-billing`              |
+| `FRONTEND_URL`  | `https://twoja-apka.vercel.app`                                          |
+| `JWT_SECRET`    | losowy ciąg (`openssl rand -hex 32`)                                     |
 | `BREVO_API_KEY` | `xkeysib-...` z [app.brevo.com](https://app.brevo.com/settings/keys/api) |
-| `SMTP_FROM` | `Moje Media <twoj@gmail.com>` |
+| `SMTP_FROM`     | `Moje Media <twoj@gmail.com>`                                            |
 
 4. Deploy → skopiuj URL (np. `https://moje-media.onrender.com`)
 
@@ -140,18 +145,18 @@ moje-media/
 
 ## 🔑 API (skrót)
 
-| Endpoint | Opis |
-|---|---|
-| `POST /api/auth/register` | rejestracja + wysyłka linku |
-| `GET /api/auth/verify?token=` | potwierdzenie e-mail |
-| `POST /api/auth/login` | logowanie → JWT |
-| `POST /api/auth/forgot-password` | link do resetu |
-| `POST /api/auth/reset-password` | nowe hasło |
-| `POST /api/auth/onboarding` | dane mieszkania |
-| `GET/PUT /api/settings` | ustawienia (auth) |
-| `GET/PUT /api/tariffs` | taryfy (auth) |
-| `GET/PUT/DELETE /api/entries/:month` | wpisy (auth) |
-| `GET /api/health` | status + DB |
+| Endpoint                             | Opis                        |
+| ------------------------------------ | --------------------------- |
+| `POST /api/auth/register`            | rejestracja + wysyłka linku |
+| `GET /api/auth/verify?token=`        | potwierdzenie e-mail        |
+| `POST /api/auth/login`               | logowanie → JWT             |
+| `POST /api/auth/forgot-password`     | link do resetu              |
+| `POST /api/auth/reset-password`      | nowe hasło                  |
+| `POST /api/auth/onboarding`          | dane mieszkania             |
+| `GET/PUT /api/settings`              | ustawienia (auth)           |
+| `GET/PUT /api/tariffs`               | taryfy (auth)               |
+| `GET/PUT/DELETE /api/entries/:month` | wpisy (auth)                |
+| `GET /api/health`                    | status + DB                 |
 
 Wszystkie dane filtrowane po `userId` z JWT.
 

@@ -18,6 +18,7 @@ export default function App() {
   const [entries, setEntries] = useState(() => JSON.parse(localStorage.getItem('mb-entries') || '[]'));
   const [month, setMonth] = useState(monthNow());
   const [water, setWater] = useState('');
+  const [customReadings, setCustomReadings] = useState({});
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
   const [tariffMonth, setTariffMonth] = useState(monthNow());
@@ -56,9 +57,18 @@ export default function App() {
 
   const saveEntry = async result => {
     if (!water) { setStatus('Wpisz aktualne wskazanie wody.'); return; }
-    const payload = entryPayload(month, previousWater, water, result, selectedTariff);
+    const payload = entryPayload(month, previousWater, water, result, selectedTariff, customReadings);
+    payload.custom = result.custom;
+    payload.customReadings = customReadings;
     setEntries([...entries.filter(e => e.month !== month), payload]);
-    setEditing(null); setWater('');
+    // Обновить lastValue счётчиков для следующего месяца
+    const updatedItems = (settings.customItems || []).map(item =>
+      item.type === 'meter' && customReadings[item.id] !== undefined
+        ? { ...item, lastValue: num(customReadings[item.id]) }
+        : item
+    );
+    if (updatedItems.length) setSettings({ ...settings, customItems: updatedItems });
+    setEditing(null); setWater(''); setCustomReadings({});
     if (API) {
       try { await apiPut(`/api/entries/${month}`, payload); setStatus('Zapisano miesiąc.'); }
       catch { setStatus('Zapisano lokalnie. API chwilowo niedostępne.'); }
@@ -131,6 +141,8 @@ export default function App() {
             selectedTariff={selectedTariff}
             onSave={saveEntry}
             savedEntry={entries.find(e => e.month === month)}
+            customReadings={customReadings}
+            setCustomReadings={setCustomReadings}
           />
         )}
         {tab === 'history' && (
