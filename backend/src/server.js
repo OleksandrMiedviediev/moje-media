@@ -354,13 +354,14 @@ let pushSchedulerStarted = false;
 function startPushScheduler() {
   if (pushSchedulerStarted) return;
   pushSchedulerStarted = true;
-  console.log('[CRON] Push scheduler started');
+  console.log('[CRON] Push scheduler started (Europe/Warsaw)');
   setInterval(async () => {
     if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
-    const now = new Date();
+    // Часовой пояс Польши
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
     const today = now.toISOString().slice(0, 10);
     const time = now.toTimeString().slice(0, 5);
-    console.log(`[CRON] ${today} ${time} — проверяю уведомления`);
+    console.log(`[CRON] ${today} ${time} (Warsaw) — проверяю уведомления`);
     try {
       const settings = await Setting.find({});
       for (const s of settings) {
