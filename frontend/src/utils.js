@@ -28,29 +28,17 @@ export const calc = (water, prev, settings, tariffs) => {
   return { usage, variable, fixed, total: variable + fixed, breakdown };
 };
 
-// EPC069-12 QR payload — сканируется любым банковским приложением (Erste George, mBank, PKO...)
+// Польский стандарт ZBP (płatność QR) — PKO, mBank, ING PL, Santander, Erste PL...
 export const toIban = raw => {
   const s = String(raw || '').replace(/\s/g, '').toUpperCase();
-  // Польский номер счёта без префикса (26 цифр) → добавляем PL
   if (/^\d{26}$/.test(s)) return `PL${s}`;
   return s;
 };
 
-export const epcQrPayload = ({ name, iban, amount, note, currency = 'EUR' }) => {
-  const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim().slice(0, 70);
+export const zbpQrPayload = ({ name, iban, amount, note }) => {
+  const clean = s => String(s || '').replace(/[\n\r]/g, ' ').trim();
   const ibanClean = toIban(iban);
-  const amt = Number(amount || 0).toFixed(2);
-  return [
-    'BCD',       // Service Tag
-    '002',       // Version
-    '1',         // Character set: UTF-8
-    'SCT',       // SEPA Credit Transfer
-    '',          // BIC (необязателен в SEPA)
-    clean(name),
-    ibanClean,
-    `${currency}${amt}`,
-    '',          // Purpose
-    '',          // Structured reference
-    clean(note)  // Remittance info (unstructured)
-  ].join('\n');
+  const grosze = Math.round(Number(amount || 0) * 100);
+  const reserved = '';
+  return `${reserved}|${ibanClean}|${grosze}|${clean(name)}|${clean(note)}|${reserved}|${reserved}|${reserved}`;
 };

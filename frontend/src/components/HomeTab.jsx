@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Droplets, QrCode, WalletCards, X } from 'lucide-react';
-import { calc, epcQrPayload, money, monthLabel, num } from '../utils';
+import { calc, money, monthLabel, num, zbpQrPayload } from '../utils';
 import { Row } from './common';
 
 function PayQrModal({ settings, total, month, onClose }) {
   const [qr, setQr] = useState('');
   useEffect(() => {
     const note = settings.paymentNote || `Media ${settings.apartment} ${month}`;
-    QRCode.toDataURL(epcQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note, currency: settings.paymentCurrency || 'EUR' }), { width: 260, margin: 1 })
+    const payload = zbpQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note });
+    QRCode.toDataURL(payload, { width: 260, margin: 1 })
       .then(setQr).catch(() => setQr(''));
   }, [settings, total, month]);
   return (
