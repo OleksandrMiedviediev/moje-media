@@ -41,3 +41,8 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .meterRow>div{flex:1;text-align:center}
 .meterRow span{display:block;font-size:10px;letter-spacing:.06em;font-weight:800;color:#7a8597;text-transform:uppercase}
 .meterRow b{display:block;font-size:15px;margin-top:3px;color:#172033}
+.payBtn{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 14px}
+.modalOverlay{position:fixed;inset:0;background:#17203399;display:flex;align-items:center;justify-content:center;z-index:30;padding:18px}
+.modal{width:100%;max-width:340px;margin:0}
+.modal .cardHead{align-items:center}
+.qrImg{display:block;width:100%;max-width:260px;margin:12px auto;border-radius:12px;border:1px solid #e5e9f0}

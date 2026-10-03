@@ -1,12 +1,35 @@
-import { Droplets, WalletCards } from 'lucide-react';
-import { calc, money, monthLabel, num } from '../utils';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import { Droplets, QrCode, WalletCards, X } from 'lucide-react';
+import { calc, epcQrPayload, money, monthLabel, num } from '../utils';
 import { Row } from './common';
+
+function PayQrModal({ settings, total, month, onClose }) {
+  const [qr, setQr] = useState('');
+  useEffect(() => {
+    const note = settings.paymentNote || `Media ${settings.apartment} ${month}`;
+    QRCode.toDataURL(epcQrPayload({ name: settings.payeeName, iban: settings.payeeIban, amount: total, note }), { width: 260, margin: 1 })
+      .then(setQr).catch(() => setQr(''));
+  }, [settings, total, month]);
+  return (
+    <div className="modalOverlay" onClick={onClose}>
+      <div className="modal card" onClick={e => e.stopPropagation()}>
+        <div className="cardHead"><h2><QrCode />Zapłać QR</h2><button className="eye" onClick={onClose}><X size={18} /></button></div>
+        <p className="authSub">Zeskanuj w aplikacji banku (George, mBank, PKO…) — kwota i odbiorca wypełnią się same.</p>
+        {qr && <img className="qrImg" src={qr} alt="QR płatności" />}
+        <div className="grand"><span>{settings.payeeName}</span><b>{money(total)}</b></div>
+      </div>
+    </div>
+  );
+}
 
 export function HomeTab({
   month, setMonth, water, setWater, editing, setEditing,
   previousWater, settings, selectedTariff, onSave
 }) {
   const result = calc(water, previousWater, settings, selectedTariff);
+  const [showQr, setShowQr] = useState(false);
+  const canPay = settings.payeeIban && settings.payeeName && result.total > 0;
 
   return (
     <>
@@ -18,6 +41,8 @@ export function HomeTab({
         </div>
         <div className="heroIcon"><WalletCards size={28} /></div>
       </section>
+      {canPay && <button className="primary payBtn" onClick={() => setShowQr(true)}><QrCode size={18} />Zapłać — pokaż kod QR</button>}
+      {showQr && <PayQrModal settings={settings} total={result.total} month={month} onClose={() => setShowQr(false)} />}
 
       <section className="card">
         <div className="cardHead">

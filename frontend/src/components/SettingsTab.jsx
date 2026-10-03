@@ -1,4 +1,4 @@
-import { Home, LogOut, Plus, Settings } from 'lucide-react';
+import { Home, LogOut, Plus, Settings, WalletCards } from 'lucide-react';
 import { LABELS } from '../constants';
 import { money, num } from '../utils';
 import { Field } from './common';
@@ -19,6 +19,17 @@ export function SettingsTab({
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
         <button className="secondary logout" onClick={onLogout}><LogOut size={16} />Wyloguj się</button>
+      </section>
+
+      <section className="card">
+        <h2><WalletCards />Płatność</h2>
+        <p>Dane odbiorcy do kodu QR — zeskanujesz go w aplikacji banku i zapłacisz jednym kliknięciem.</p>
+        <div className="grid">
+          <Field label="Odbiorca (nazwa)" value={settings.payeeName} onChange={v => setSettings({ ...settings, payeeName: v })} />
+          <Field label="IBAN odbiorcy" value={settings.payeeIban} onChange={v => setSettings({ ...settings, payeeIban: v.replace(/\s/g, '').toUpperCase() })} />
+          <Field label="Tytuł przelewu (opcjonalnie)" value={settings.paymentNote} onChange={v => setSettings({ ...settings, paymentNote: v })} />
+        </div>
+        <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
       </section>
 
       <section className="card">
