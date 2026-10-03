@@ -20,9 +20,7 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
   const addNotif = async () => {
     const id = `n${Date.now()}`;
     const next = [...(settings.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }];
-    console.log('[NOTIF] add', next);
     const updatedApt = { ...settings, notifications: next };
-    console.log('[NOTIF] updatedApt', updatedApt);
     setSettings({ notifications: next });
     await save(updatedApt);
   };
