@@ -148,8 +148,15 @@ export default function App() {
     setSettings({ ...settings, apartments: updatedApts });
     setEditing(null); setWater(''); setCustomReadings({});
     if (API) {
-      try { await apiPut(`/api/entries/${month}`, payload); setStatus('Zapisano miesiąc.'); }
-      catch { setStatus('Zapisano lokalnie. API chwilowo niedostępne.'); }
+      try {
+        console.log('[SAVE] entry →', `${API}/api/entries/${month}`, payload);
+        const saved = await apiPut(`/api/entries/${month}`, payload);
+        console.log('[SAVE] OK', saved);
+        setStatus('Zapisano miesiąc.');
+      } catch (e) {
+        console.error('[SAVE] BŁĄD', e.message, e.response?.data);
+        setStatus(`Zapisano lokalnie. Błąd API: ${e.response?.data?.error || e.message}`);
+      }
     } else setStatus('Zapisano miesiąc.');
   };
 
