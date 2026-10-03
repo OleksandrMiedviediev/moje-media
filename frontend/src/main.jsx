@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import axios from 'axios';
-import { BarChart3, ChevronDown, ChevronUp, Droplets, Home, Pencil, Plus, Settings, Trash2, WalletCards, X } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, Droplets, Home, LogOut, Pencil, Plus, Settings, Trash2, WalletCards, X } from 'lucide-react';
 import './styles.css';
 
 const API = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+axios.interceptors.request.use(cfg=>{const t=localStorage.getItem('mb-token');if(t)cfg.headers.Authorization=`Bearer ${t}`;return cfg;});
 const DEFAULT_SETTINGS = { apartment:'Wiejska 3 / 6', area:59.51, residents:3 };
 const DEFAULT_TARIFFS = { coldWater:8.47, sewage:12.39, wastePerPerson:40, maintenancePerM2:1.10, administrationPerM2:1.03, cleaning:26, stairLightPerPerson:2.40, renovationPerM2:1.50 };
 const LABELS = { coldWater:'Zimna woda', sewage:'Ścieki', wastePerPerson:'Śmieci', maintenancePerM2:'Konserwacja', administrationPerM2:'Administracja', cleaning:'Sprzątanie klatek', stairLightPerPerson:'Światło klatki', renovationPerM2:'Fundusz remontowy' };
@@ -25,6 +26,7 @@ async function apiPut(path,data){ return (await axios.put(`${API}${path}`,data))
 async function apiDelete(path){ return axios.delete(`${API}${path}`); }
 
 function App(){
+  const [auth,setAuth]=useState(()=>{const t=localStorage.getItem('mb-token');return t?{token:t,onboarded:true}:null;});
   const [settings,setSettings]=useState(()=>JSON.parse(localStorage.getItem('mb-settings')||'null')||DEFAULT_SETTINGS);
   const [tariffs,setTariffs]=useState(()=>JSON.parse(localStorage.getItem('mb-tariffs')||'null')||[{effectiveFrom:'2026-01',values:DEFAULT_TARIFFS}]);
   const [entries,setEntries]=useState(()=>JSON.parse(localStorage.getItem('mb-entries')||'[]'));
@@ -35,6 +37,8 @@ function App(){
   const [tariffMonth,setTariffMonth]=useState(monthNow());
   const [status,setStatus]=useState('');
   const [expanded,setExpanded]=useState(null);
+
+  const logout=()=>{localStorage.removeItem('mb-token');setAuth(null);};
 
   const sortedEntries=useMemo(()=>[...entries].sort((a,b)=>b.month.localeCompare(a.month)),[entries]);
   const previousEntry=entries.filter(e=>e.month<month).sort((a,b)=>b.month.localeCompare(a.month))[0];
@@ -47,9 +51,12 @@ function App(){
   useEffect(()=>localStorage.setItem('mb-tariffs',JSON.stringify(tariffs)),[tariffs]);
   useEffect(()=>localStorage.setItem('mb-entries',JSON.stringify(entries)),[entries]);
   useEffect(()=>{
-    if(!API) return;
+    if(!API||!auth) return;
     (async()=>{try{const [s,t,e]=await Promise.all([apiGet('/api/settings'),apiGet('/api/tariffs'),apiGet('/api/entries')]); setSettings(s); setTariffs(t); setEntries(e);}catch{setStatus('Tryb lokalny — API nie jest dostępne.');}})();
-  },[]);
+  },[auth]);
+
+  if(!auth) return <AuthScreen onAuth={setAuth}/>;
+  if(!auth.onboarded) return <OnboardingScreen onDone={data=>{setAuth({...auth,onboarded:true});setSettings(s=>({...s,...data}));}}/>;
 
   const saveEntry=async()=>{
     if(!water){setStatus('Wpisz aktualne wskazanie wody.');return;}
@@ -85,11 +92,50 @@ function App(){
         <section className="card"><h2>Historia rozliczeń</h2>{sortedEntries.length===0?<Empty/>:<div className="history">{sortedEntries.map(e=><div className="historyItem" key={e.month}><button className="historyMain" onClick={()=>setExpanded(expanded===e.month?null:e.month)}><div><b>{monthLabel(e.month)}</b><small>{num(e.usage).toFixed(2).replace('.',',')} m³ wody</small></div><strong>{money(e.total)}</strong>{expanded===e.month?<ChevronUp/>:<ChevronDown/>}</button>{expanded===e.month&&<div className="historyDetails"><Row name="Woda" value={e.breakdown?.water}/><Row name="Ścieki" value={e.breakdown?.sewage}/><Row name="Pozostałe" value={num(e.total)-num(e.breakdown?.water)-num(e.breakdown?.sewage)}/><div className="actions"><button onClick={()=>editEntry(e)}><Pencil size={16}/>Edytuj</button><button className="danger" onClick={()=>removeEntry(e)}><Trash2 size={16}/>Usuń</button></div></div>}</div>)}</div>}</section>
       </>}
       {tab==='settings'&&<>
-        <section className="card"><h2><Home/>Mieszkanie</h2><div className="grid"><Field label="Adres / nazwa" value={settings.apartment} onChange={v=>setSettings({...settings,apartment:v})}/><Field label="Powierzchnia m²" value={settings.area} type="number" onChange={v=>setSettings({...settings,area:num(v)})}/><Field label="Liczba osób" value={settings.residents} type="number" onChange={v=>setSettings({...settings,residents:num(v)})}/></div><button className="secondary" onClick={async()=>{if(API)try{await apiPut('/api/settings',settings);setStatus('Ustawienia zapisane na serwerze.')}catch{setStatus('Zapisano lokalnie.')}}}>Zapisz dane</button></section>
+        <section className="card"><h2><Home/>Mieszkanie</h2><div className="grid"><Field label="Adres / nazwa" value={settings.apartment} onChange={v=>setSettings({...settings,apartment:v})}/><Field label="Powierzchnia m²" value={settings.area} type="number" onChange={v=>setSettings({...settings,area:num(v)})}/><Field label="Liczba osób" value={settings.residents} type="number" onChange={v=>setSettings({...settings,residents:num(v)})}/></div><button className="secondary" onClick={async()=>{if(API)try{await apiPut('/api/settings',settings);setStatus('Ustawienia zapisane na serwerze.')}catch{setStatus('Zapisano lokalnie.')}}}>Zapisz dane</button><button className="secondary logout" onClick={logout}><LogOut size={16}/>Wyloguj się</button></section>
         <section className="card"><div className="cardHead"><div><h2><Settings/>Taryfy</h2><p>Zmiana obowiązuje od wybranego miesiąca. Stare miesiące pozostają bez zmian.</p></div><button className="add" onClick={saveTariff}><Plus size={17}/>Dodaj / zapisz</button></div><label className="wide">Taryfikator od miesiąca<input type="month" value={tariffMonth} onChange={e=>setTariffMonth(e.target.value)}/></label><div className="grid">{Object.entries(LABELS).map(([key,label])=><Field key={key} label={label+(key.includes('PerM2')?' zł/m²':key.includes('PerPerson')?' zł/os.':key==='cleaning'?' zł/lokal':' zł/jedn.')} value={activeTariff[key]} type="number" step="0.01" onChange={v=>updateTariff(key,v)}/>)}</div><div className="tariffHistory"><b>Historia zmian</b>{[...tariffs].sort((a,b)=>b.effectiveFrom.localeCompare(a.effectiveFrom)).map(t=><div key={t.effectiveFrom}><span>Od {t.effectiveFrom}</span><small>{money(t.values.coldWater)}/m³ woda · {money(t.values.sewage)}/m³ ścieki</small></div>)}</div></section>
       </>}
     </main>
   </div>
+}
+function AuthScreen({onAuth}){
+  const [mode,setMode]=useState('login');
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [msg,setMsg]=useState('');
+  const [err,setErr]=useState('');
+  const [verifyToken]=useState(()=>new URLSearchParams(window.location.search).get('verify'));
+  useEffect(()=>{if(!verifyToken)return;apiGet(`/api/auth/verify?token=${verifyToken}`).then(r=>{setMsg(r.message);window.history.replaceState({},'',window.location.pathname);}).catch(e=>setErr(e.response?.data?.error||'Błąd potwierdzenia'));},[verifyToken]);
+  const submit=async e=>{
+    e.preventDefault();setErr('');setMsg('');
+    try{
+      if(mode==='register'){
+        const res=await axios.post(`${API}/api/auth/register`,{email,password});
+        setMsg(res.data.devLink?`DEV: otwórz ${res.data.devLink}`:res.data.message);
+      }else{
+        const res=await axios.post(`${API}/api/auth/login`,{email,password});
+        localStorage.setItem('mb-token',res.data.token);
+        onAuth({token:res.data.token,onboarded:res.data.onboarded});
+      }
+    }catch(e2){setErr(e2.response?.data?.error||'Błąd połączenia z serwerem');}
+  };
+  const resend=async()=>{setErr('');setMsg('');try{const res=await axios.post(`${API}/api/auth/resend-verification`,{email});setMsg(res.data.message);}catch{setErr('Błąd połączenia');}};
+  return <div className="app authApp"><div className="authCard card"><div className="eyebrow">DOMOWE MEDIA</div><h1>Moje Media</h1><p className="authSub">Domowe rozliczenia mediów — woda, ścieki, opłaty stałe.</p><form onSubmit={submit}><label>Adres e-mail<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="jan@example.com"/></label><label>Hasło<input type="password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} placeholder="min. 6 znaków"/></label>{err&&<div className="authErr">{err}{err.includes('Potwierdź')&&<button type="button" className="link" onClick={resend}>Wyślij link ponownie</button>}</div>}{msg&&<div className="authOk">{msg}</div>}<button className="primary" type="submit">{mode==='login'?'Zaloguj się':'Załóż konto'}</button></form><button className="link" onClick={()=>{setMode(mode==='login'?'register':'login');setErr('');setMsg('');}}>{mode==='login'?'Nie masz konta? Zarejestruj się':'Masz już konto? Zaloguj się'}</button></div></div>;
+}
+function OnboardingScreen({onDone}){
+  const [apartment,setApartment]=useState('');
+  const [area,setArea]=useState('');
+  const [residents,setResidents]=useState('');
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+  const submit=async e=>{
+    e.preventDefault();setErr('');setBusy(true);
+    try{
+      await axios.post(`${API}/api/auth/onboarding`,{apartment,area:num(area),residents:num(residents)});
+      onDone({apartment,area:num(area),residents:num(residents)});
+    }catch(e2){setErr(e2.response?.data?.error||'Błąd zapisu');}finally{setBusy(false);}
+  };
+  return <div className="app authApp"><div className="authCard card"><div className="eyebrow">PIERWSZE URUCHOMIENIE</div><h1>Twoje mieszkanie</h1><p className="authSub">Podaj podstawowe dane — posłużą do rozliczeń.</p><form onSubmit={submit}><label>Adres / nazwa<input required value={apartment} onChange={e=>setApartment(e.target.value)} placeholder="np. Wiejska 3 / 6"/></label><label>Powierzchnia m²<input required inputMode="decimal" value={area} onChange={e=>setArea(e.target.value)} placeholder="np. 59,5"/></label><label>Liczba osób<input required inputMode="numeric" value={residents} onChange={e=>setResidents(e.target.value)} placeholder="np. 3"/></label>{err&&<div className="authErr">{err}</div>}<button className="primary" type="submit" disabled={busy}>{busy?'Zapisywanie…':'Zapisz i rozpocznij'}</button></form></div></div>;
 }
 function Row({name,value}){return <div className="row"><span>{name}</span><b>{money(value)}</b></div>}
 function Field({label,value,onChange,type='text',step}){return <label>{label}<input type={type} step={step} value={value??''} onChange={e=>onChange(e.target.value)}/></label>}
