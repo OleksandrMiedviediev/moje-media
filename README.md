@@ -1,37 +1,162 @@
-# Moje Media — React + Vercel + Render + MongoDB
+# 💧 Moje Media
 
-Aplikacja do domowych rozliczeń mediów. Wersja nie zawiera QR ani płatności.
+Aplikacja do domowych rozliczeń mediów: woda, ścieki i opłaty stałe. Rejestracja z potwierdzeniem e-mail, prywatne dane każdego użytkownika, historia z wykresem i celem zużycia, płatność kodem QR (polski standard ZBP).
 
-## Funkcje
-- aktualne i poprzednie wskazanie zimnej wody;
-- automatyczne zużycie m³;
-- automatyczne rozliczenie wody, ścieków i opłat stałych;
-- historia miesięcy;
-- edycja/usuwanie miesiąca;
-- metryki i wykres zużycia;
-- taryfy z datą obowiązywania — zmiana od konkretnego miesiąca nie zmienia starych wpisów;
-- dane mieszkania i liczba mieszkańców;
-- zapis lokalny jako fallback oraz synchronizacja z MongoDB przez API.
+**Stack:** React 19 · Vite · Express 5 · MongoDB · Brevo (e-mail)
 
-## Backend / Render
-1. Utwórz MongoDB Atlas i bazę.
-2. Na Render utwórz **Web Service** wskazujący folder `backend`.
-3. Build Command: `npm install`
-4. Start Command: `npm start`
-5. Environment Variables:
-   - `MONGODB_URI` — connection string Atlas
-   - `FRONTEND_URL` — URL aplikacji Vercel, np. `https://moje-media.vercel.app`
-   - `PORT` — Render ustawi automatycznie; można zostawić.
+---
 
-## Frontend / Vercel
-1. Importuj repo do Vercel.
-2. Root Directory: `frontend`.
-3. Build Command: `npm run build`
-4. Output Directory: `dist`
-5. Environment Variable:
-   - `VITE_API_URL=https://TWOJ-BACKEND.onrender.com`
+## ✨ Funkcje
 
-Po zmianie `FRONTEND_URL` na Vercel URL zrób redeploy backendu.
+### 🔐 Konto użytkownika
+- rejestracja e-mail + hasło z potwierdzeniem adresu (link na mail);
+- logowanie, reset hasła przez e-mail;
+- onboarding: adres, powierzchnia, liczba mieszkańców — przy pierwszym logowaniu;
+- wszystkie dane prywatne — każdy widzi tylko swoje mieszkanie.
 
-## Ważne
-Jeżeli backend jest niedostępny, aplikacja nadal działa lokalnie w przeglądarce. Po przywróceniu API dane lokalne nie są automatycznie scalane z bazą — dlatego przed pierwszym wdrożeniem najlepiej zacząć od pustej aplikacji i używać jednego urządzenia.
+### 📊 Bieżące rozliczenie
+- wpisujesz tylko **aktualne wskazanie wody** — zużycie i suma liczą się automatycznie;
+- rozbicie: zimna woda, ścieki, śmieci, konserwacja, administracja, sprzątanie, światło klatki, fundusz remontowy;
+- taryfy z datą obowiązywania — zmiana stawek nie rusza starych miesięcy;
+- po zapisie suma pozostaje widoczna (nie przelicza się z pustego pola).
+
+### 📈 Historia
+- lista miesięcy z filtrami po roku i paginacją (5/10/20/50 na stronę);
+- wykres zużycia z przewijaniem poziomym: miesiące lub suma roczna;
+- pod każdym słupkiem kwota do zapłaty;
+- **cel zużycia** (m³/os./mies.) — słupki powyżej celu podświetlone na czerwono;
+- rozwinięcie miesiąca: wskazania licznika + pełne rozbicie kosztów;
+- edycja, usunięcie, płatność dowolnego miesiąca.
+
+### 💳 Płatność QR
+- kod QR w polskim standardzie **ZBP** — skanujesz w aplikacji banku (PKO, mBank, ING, Santander, Erste PL…);
+- automatycznie wypełnia: numer konta, NIP odbiorcy, kwotę, tytuł przelewu;
+- przycisk „Zapłać” przy bieżącym miesiącu i przy każdym miesiącu w historii.
+
+### 💾 Zapamiętywanie
+- aktywna zakładka, filtry i rozmiar strony zachowują się po odświeżeniu;
+- fallback lokalny (localStorage), gdy API niedostępne.
+
+---
+
+## 🚀 Szybki start (lokalnie)
+
+```bash
+# 1. Klon i instalacja
+git clone https://github.com/OleksandrMiedviediev/moje-media.git
+cd moje-media
+npm install
+cd backend && npm install && cd ..
+cd frontend && npm install && cd ..
+
+# 2. Zmienne środowiskowe backendu
+cp backend/.env.example backend/.env
+# uzupełnij MONGODB_URI, JWT_SECRET, BREVO_API_KEY (patrz niżej)
+
+# 3. Start — API (10000) + frontend (5173) jednocześnie
+npm run dev
+```
+
+Otwórz http://localhost:5173 → zarejestruj się → potwierdź e-mail → podaj dane mieszkania.
+
+---
+
+## ☁️ Deploy
+
+### Backend → Render
+
+1. **New → Web Service** → repo `moje-media`, Root Directory: `backend`
+2. Build: `npm install` · Start: `npm start`
+3. Environment Variables:
+
+| Key | Value |
+|---|---|
+| `MONGODB_URI` | `mongodb+srv://user:pass@cluster.mongodb.net/media-billing` |
+| `FRONTEND_URL` | `https://twoja-apka.vercel.app` |
+| `JWT_SECRET` | losowy ciąg (`openssl rand -hex 32`) |
+| `BREVO_API_KEY` | `xkeysib-...` z [app.brevo.com](https://app.brevo.com/settings/keys/api) |
+| `SMTP_FROM` | `Moje Media <twoj@gmail.com>` |
+
+4. Deploy → skopiuj URL (np. `https://moje-media.onrender.com`)
+
+### Frontend → Vercel
+
+1. Import repo → Root Directory: `frontend`
+2. Build: `npm run build` · Output: `dist`
+3. Environment Variable: `VITE_API_URL` = URL z Render
+4. Deploy → Redeploy backendu po zmianie `FRONTEND_URL`
+
+---
+
+## 🗄️ MongoDB Atlas
+
+1. [cloud.mongodb.com](https://cloud.mongodb.com) → **M0 Free** cluster
+2. **Database Access** → użytkownik z `readWriteAnyDatabase`
+3. **Network Access** → `0.0.0.0/0` (dla Render)
+4. Connect → Drivers → skopiuj connection string do `MONGODB_URI`
+
+Kolekcje (`users`, `entries`, `tariffs`, `settings`) tworzą się automatycznie.
+
+---
+
+## 📧 E-mail (Brevo)
+
+Render free blokuje porty SMTP — używamy **Brevo HTTP API**:
+
+1. [app.brevo.com](https://app.brevo.com) → **SMTP & API → API Keys** → Generate
+2. Skopiuj `xkeysib-...` do `BREVO_API_KEY` na Render
+3. Dodaj sender w **Senders** (e-mail musi być potwierdzony)
+
+Bez klucza aplikacja działa, ale linki potwierdzające wypisuje tylko w logach serwera.
+
+---
+
+## 🗂️ Struktura
+
+```
+moje-media/
+├── backend/
+│   ├── src/server.js       # Express API: auth, entries, tariffs, settings
+│   ├── .env.example
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── main.jsx        # punkt wejścia
+│   │   ├── App.jsx         # stan globalny, zakładki
+│   │   ├── constants.js    # domyślne ustawienia/taryfy
+│   │   ├── utils.js        # calc, money, epc/zbp QR
+│   │   ├── api.js          # axios + token
+│   │   └── components/
+│   │       ├── Auth.jsx        # logowanie/rejestracja/reset
+│   │       ├── HomeTab.jsx     # bieżące rozliczenie + QR
+│   │       ├── HistoryTab.jsx  # historia, wykres, filtry
+│   │       └── SettingsTab.jsx # mieszkanie, taryfy, płatność
+│   ├── public/favicon.svg
+│   └── vite.config.js
+└── package.json            # npm run dev — oba serwisy naraz
+```
+
+---
+
+## 🔑 API (skrót)
+
+| Endpoint | Opis |
+|---|---|
+| `POST /api/auth/register` | rejestracja + wysyłka linku |
+| `GET /api/auth/verify?token=` | potwierdzenie e-mail |
+| `POST /api/auth/login` | logowanie → JWT |
+| `POST /api/auth/forgot-password` | link do resetu |
+| `POST /api/auth/reset-password` | nowe hasło |
+| `POST /api/auth/onboarding` | dane mieszkania |
+| `GET/PUT /api/settings` | ustawienia (auth) |
+| `GET/PUT /api/tariffs` | taryfy (auth) |
+| `GET/PUT/DELETE /api/entries/:month` | wpisy (auth) |
+| `GET /api/health` | status + DB |
+
+Wszystkie dane filtrowane po `userId` z JWT.
+
+---
+
+## 📝 Licencja
+
+Prywatny projekt domowy.
