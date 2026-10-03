@@ -1,3 +1,4 @@
+// Push fix: always sync subscription to server
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Home, Moon, Settings, Sun, WalletCards, X } from 'lucide-react';
 import { API, DEFAULT_SETTINGS, DEFAULT_TARIFFS } from './constants';
