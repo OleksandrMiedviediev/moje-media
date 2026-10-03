@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Home, Moon, Settings, Sun, WalletCards, X } from 'lucide-react';
 import { API, DEFAULT_SETTINGS, DEFAULT_TARIFFS } from './constants';
 import { apiDelete, apiGet, apiPost, apiPut } from './api';
@@ -49,6 +49,10 @@ export default function App() {
   const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
   const [dark, setDark] = useState(() => localStorage.getItem('mb-theme') === 'dark');
+
+  // Актуальный settings для замыканий (push, notifications)
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
     localStorage.setItem('mb-theme', dark ? 'dark' : 'light');
@@ -292,7 +296,7 @@ export default function App() {
             onLogout={logout}
             dark={dark} setDark={setDark}
             setAllSettings={setSettings}
-            getAllSettings={() => settings}
+            getAllSettings={() => settingsRef.current}
           />
         )}
       </main>
