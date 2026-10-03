@@ -111,9 +111,20 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
                   </button>
                   {expanded === e.month && (
                     <div className="historyDetails">
-                      <Row name="Woda" value={e.breakdown?.water} />
-                      <Row name="Ścieki" value={e.breakdown?.sewage} />
-                      <Row name="Pozostałe" value={num(e.total) - num(e.breakdown?.water) - num(e.breakdown?.sewage)} />
+                    <div className="meterRow">
+                      <div><span>Poprzednie</span><b>{num(e.previousWater).toFixed(2).replace('.', ',')} m³</b></div>
+                      <div><span>Aktualne</span><b>{num(e.currentWater).toFixed(2).replace('.', ',')} m³</b></div>
+                      <div><span>Zużycie</span><b>{num(e.usage).toFixed(2).replace('.', ',')} m³</b></div>
+                    </div>
+                    <Row name="Zimna woda" value={e.breakdown?.water} />
+                    <Row name="Ścieki" value={e.breakdown?.sewage} />
+                    <div className="separator" />
+                    <Row name="Śmieci" value={e.breakdown?.waste} />
+                    <Row name="Konserwacja" value={e.breakdown?.maintenance} />
+                    <Row name="Administracja" value={e.breakdown?.administration} />
+                    <Row name="Sprzątanie klatek" value={e.breakdown?.cleaning} />
+                    <Row name="Światło klatki" value={e.breakdown?.light} />
+                    <Row name="Fundusz remontowy" value={e.breakdown?.renovation} />
                       <div className="actions">
                         <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
                         <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>

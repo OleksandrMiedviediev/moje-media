@@ -37,3 +37,7 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .pagination button{border:1px solid #e2e7ef;background:#fff;border-radius:8px;width:34px;height:34px;font-size:15px;font-weight:700;color:#4a5568;cursor:pointer}
 .pagination button:disabled{opacity:.35;cursor:default}
 .pagination span{font-size:13px;font-weight:700;color:#7a8597;min-width:52px;text-align:center}
+.meterRow{display:flex;gap:10px;background:#f4f6fa;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.meterRow>div{flex:1;text-align:center}
+.meterRow span{display:block;font-size:10px;letter-spacing:.06em;font-weight:800;color:#7a8597;text-transform:uppercase}
+.meterRow b{display:block;font-size:15px;margin-top:3px;color:#172033}
