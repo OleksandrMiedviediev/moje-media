@@ -158,9 +158,10 @@ export default function App() {
     setSettings({ ...settings, apartments: updatedApts });
   };
 
-  const saveSettings = async () => {
+  const saveSettings = async (override) => {
+    const toSave = override || settings;
     if (API) {
-      try { await apiPut('/api/settings', settings); setStatus('Ustawienia zapisane na serwerze.'); }
+      try { await apiPut('/api/settings', toSave); setStatus('Ustawienia zapisane na serwerze.'); }
       catch { setStatus('Zapisano lokalnie.'); }
     }
   };
