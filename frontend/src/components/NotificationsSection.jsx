@@ -7,7 +7,7 @@ const NOTIF_TYPES = [
   { id: 'payment', name: 'Do zapłaty' }
 ];
 
-export function NotificationsSection({ settings, setSettings, onSaveSettings, getAllSettings, activeApartmentId }) {
+export function NotificationsSection({ settings, setSettings, onSaveSettings, getAllSettings, activeApartmentId, registerPush }) {
   const notifs = settings.notifications || [];
   const [newType, setNewType] = useState('reading');
   const [newDay, setNewDay] = useState('25');
@@ -44,22 +44,11 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, ge
     setTimeout(() => save(updatedApt), 0);
   };
 
-  const requestPermission = async () => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') return;
-    if (Notification.permission === 'denied') {
-      alert('Powiadomienia zablokowane. Włącz w ustawieniach przeglądarki.');
-      return;
-    }
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') alert('Brak zgody na powiadomienia.');
-  };
-
   return (
     <section className="card">
       <h2><Bell />Powiadomienia</h2>
       <p>Przypomnienia o wpisaniu wskazań lub płatności — push na telefon.</p>
-      <button className="secondary" onClick={requestPermission} style={{ marginBottom: '12px' }}>
+      <button className="secondary" onClick={registerPush} style={{ marginBottom: '12px' }}>
         <Bell size={16} /> Włącz powiadomienia push
       </button>
 

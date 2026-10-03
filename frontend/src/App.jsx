@@ -88,7 +88,41 @@ export default function App() {
     })();
   }, [auth]);
 
-  // Подписка на push при первой загрузке (если разрешено)
+  // Подписка на push — вызывается из кнопки в NotificationsSection
+  const registerPush = async () => {
+    if (!('serviceWorker' in navigator)) {
+      setStatus('Service Worker nie jest obsługiwany');
+      return;
+    }
+    if (!('PushManager' in window)) {
+      setStatus('Push notifications nie są obsługiwane');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      setStatus('Brak zgody na powiadomienia');
+      return;
+    }
+    try {
+      await navigator.serviceWorker.register('/sw.js');
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('SW timeout')), 5000))
+      ]);
+      const { key } = await apiGet('/api/push/vapid-key');
+      if (!key) return;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key)
+      });
+      await apiPost('/api/push/subscribe', subscription.toJSON());
+      setStatus('Powiadomienia włączone');
+    } catch (e) {
+      setStatus(`Błąd push: ${e.message}`);
+    }
+  };
+
+  // Авто-подписка при загрузке (если уже разрешено)
   useEffect(() => {
     if (!API || !auth || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
     if (Notification.permission !== 'granted') return;
@@ -102,17 +136,12 @@ export default function App() {
         const { key } = await apiGet('/api/push/vapid-key');
         if (!key) return;
         const sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
-          await apiPost('/api/push/subscribe', newSub.toJSON());
-          console.log('[PUSH] Subscribed');
-        } else {
-          // Всегда отправляем на сервер — если там нет, восстановится
+        if (sub) {
           await apiPost('/api/push/subscribe', sub.toJSON());
-          console.log('[PUSH] Already subscribed — synced to server');
         }
-      } catch (e) { console.error('[PUSH] Error:', e.message); }
+      } catch { /* ignore */ }
     })();
+  }, [auth]);
   }, [auth]);
 
   function urlBase64ToUint8Array(base64String) {
@@ -300,6 +329,7 @@ export default function App() {
             dark={dark} setDark={setDark}
             setAllSettings={setSettings}
             getAllSettings={() => settingsRef.current}
+            registerPush={registerPush}
           />
         )}
       </main>
