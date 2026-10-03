@@ -360,8 +360,8 @@ function startPushScheduler() {
     // Часовой пояс Польши
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Warsaw' }));
     const today = now.toISOString().slice(0, 10);
-    const time = now.toTimeString().slice(0, 5);
-    console.log(`[CRON] ${today} ${time} (Warsaw) — проверяю уведомления`);
+    const currentTime = now.toTimeString().slice(0, 5);
+    console.log(`[CRON] ${today} ${currentTime} (Warsaw) — проверяю уведомления`);
     try {
       const settings = await Setting.find({});
       for (const s of settings) {
@@ -369,9 +369,11 @@ function startPushScheduler() {
         for (const apt of apts) {
           const notifs = apt.notifications || [];
           for (const n of notifs) {
-            if (!n.active || n.time !== time) continue;
+            if (!n.active) continue;
+            // Время назначено <= текущего (не позже), и сегодня ещё не отправляли
+            if (n.time > currentTime) continue;
             if (n.lastSent === today) continue;
-            console.log(`[CRON] Проверка ${apt.name} ${n.type} день ${n.day} — сегодня ${now.getDate()}`);
+            console.log(`[CRON] Проверка ${apt.name} ${n.type} день ${n.day} время ${n.time} — сегодня ${now.getDate()} ${currentTime}`);
             let shouldSend = false;
             let title = `Moje Media — ${apt.name || 'Mieszkanie'}`;
             let body = '';
@@ -395,7 +397,7 @@ function startPushScheduler() {
         await s.save();
       }
     } catch (e) { console.error('Push scheduler error:', e.message); }
-  }, 60 * 60 * 1000); // каждый час
+  }, 5 * 60 * 1000); // каждые 5 минут
 }
 
 if (process.env.MONGODB_URI) mongoose.connect(process.env.MONGODB_URI).then(() => { console.log('MongoDB connected'); startPushScheduler(); }).catch(err => console.error('MongoDB connection error:', err.message));
