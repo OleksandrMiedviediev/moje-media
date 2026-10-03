@@ -342,12 +342,21 @@ async function sendPush(userId, title, body) {
   }
 }
 
+// Тестовый endpoint: отправить push вручную (для диагностики)
+app.post('/api/push/test', auth, async (req, res) => {
+  try {
+    await sendPush(req.user._id, 'Moje Media — test', 'To testowe powiadomienie. Działa!');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Планировщик: проверка каждый час
 setInterval(async () => {
   if (!process.env.VAPID_PRIVATE_KEY || mongoose.connection.readyState !== 1) return;
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const time = now.toTimeString().slice(0, 5);
+  console.log(`[CRON] ${today} ${time} — проверяю уведомления`);
   try {
     const settings = await Setting.find({});
     for (const s of settings) {
@@ -357,6 +366,7 @@ setInterval(async () => {
         for (const n of notifs) {
           if (!n.active || n.time !== time) continue;
           if (n.lastSent === today) continue;
+          console.log(`[CRON] Проверка ${apt.name} ${n.type} день ${n.day} — сегодня ${now.getDate()}`);
           let shouldSend = false;
           let title = `Moje Media — ${apt.name || 'Mieszkanie'}`;
           let body = '';
@@ -371,6 +381,7 @@ setInterval(async () => {
             if (entry) { shouldSend = true; body = `Do zapłaty: ${Number(entry.total).toFixed(2)} zł za ${month}`; }
           }
           if (shouldSend) {
+            console.log(`[CRON] Отправляю push для ${s.userId}`);
             await sendPush(s.userId, title, body);
             n.lastSent = today;
           }
