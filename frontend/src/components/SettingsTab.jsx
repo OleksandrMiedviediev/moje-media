@@ -15,6 +15,7 @@ export function SettingsTab({
           <Field label="Adres / nazwa" value={settings.apartment} onChange={v => setSettings({ ...settings, apartment: v })} />
           <Field label="Powierzchnia m²" value={settings.area} type="number" onChange={v => setSettings({ ...settings, area: num(v) })} />
           <Field label="Liczba osób" value={settings.residents} type="number" onChange={v => setSettings({ ...settings, residents: num(v) })} />
+          <Field label="Cel wody m³/os./mies." value={settings.waterGoalPerPerson ?? ''} type="number" step="0.1" onChange={v => setSettings({ ...settings, waterGoalPerPerson: num(v) })} />
         </div>
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
         <button className="secondary logout" onClick={onLogout}><LogOut size={16} />Wyloguj się</button>

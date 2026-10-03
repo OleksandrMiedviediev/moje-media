@@ -24,3 +24,7 @@
 input{width:100%;max-width:100%;min-width:0}
 input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 @supports (-webkit-appearance:none){input[type="month"]::-webkit-date-and-time-value{text-align:left}}
+.barTotal{display:block;font-size:10px;color:#8a94a6;margin-top:2px;font-weight:600}
+.bar.over{background:#ef4444}
+.barWrap .bar{position:relative}
+.goalInfo{margin-top:10px;font-size:12px;color:#7c8799;border-top:1px dashed #e2e7ef;padding-top:10px}

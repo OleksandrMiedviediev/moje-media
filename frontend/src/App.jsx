@@ -134,6 +134,7 @@ export default function App() {
           <HistoryTab
             entries={entries}
             sortedEntries={sortedEntries}
+            settings={settings}
             onEdit={editEntry}
             onRemove={removeEntry}
           />
