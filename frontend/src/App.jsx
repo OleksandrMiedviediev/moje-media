@@ -82,15 +82,22 @@ export default function App() {
     if (Notification.permission !== 'granted') return;
     (async () => {
       try {
+        await navigator.serviceWorker.register('/sw.js');
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('SW timeout')), 5000))
+        ]);
         const { key } = await apiGet('/api/push/vapid-key');
         if (!key) return;
-        const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         if (!sub) {
           const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
           await apiPost('/api/push/subscribe', newSub.toJSON());
+          console.log('[PUSH] Subscribed');
+        } else {
+          console.log('[PUSH] Already subscribed');
         }
-      } catch { /* ignore */ }
+      } catch (e) { console.error('[PUSH] Error:', e.message); }
     })();
   }, [auth]);
 
