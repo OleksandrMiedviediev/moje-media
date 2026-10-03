@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, Pencil, QrCode, Trash2 } from 'lucide-react';
 import { money, monthLabel, num } from '../utils';
 import { Empty, Row } from './common';
+import { PayQrModal } from './HomeTab';
 
 const PAGE_SIZES = [5, 10, 20, 50];
 
@@ -11,6 +12,9 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
   const [yearFilter, setYearFilter] = useState(() => localStorage.getItem('mb-history-year') || 'all');
   const [pageSize, setPageSize] = useState(() => Number(localStorage.getItem('mb-history-page-size')) || 10);
   const [page, setPage] = useState(0);
+  const [payFor, setPayFor] = useState(null);
+
+  const canPay = settings?.payeeIban && settings?.payeeName;
 
   useEffect(() => localStorage.setItem('mb-chart-mode', chartMode), [chartMode]);
   useEffect(() => localStorage.setItem('mb-history-year', yearFilter), [yearFilter]);
@@ -127,6 +131,7 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
                     <Row name="Fundusz remontowy" value={e.breakdown?.renovation} />
                       <div className="actions">
                         <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
+                        {canPay && <button onClick={() => setPayFor(e)}><QrCode size={16} />Zapłać</button>}
                         <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>
                       </div>
                     </div>
@@ -146,6 +151,15 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
           </>
         )}
       </section>
+
+      {payFor && (
+        <PayQrModal
+          settings={settings}
+          total={num(payFor.total)}
+          month={payFor.month}
+          onClose={() => setPayFor(null)}
+        />
+      )}
     </>
   );
 }

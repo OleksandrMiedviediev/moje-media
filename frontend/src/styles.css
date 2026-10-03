@@ -47,3 +47,4 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .modal .cardHead{align-items:center}
 .qrImg{display:block;width:100%;max-width:260px;margin:12px auto;border-radius:12px;border:1px solid #e5e9f0}
 .grid select,.filters select{border:1px solid #e2e7ef;border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;background:#f9fafc;width:100%;color:#172033}
+.qrMonth{display:block;text-align:center;margin-top:8px;color:#7a8597;font-size:13px}

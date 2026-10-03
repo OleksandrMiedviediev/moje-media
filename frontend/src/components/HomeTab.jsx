@@ -4,7 +4,7 @@ import { Droplets, QrCode, WalletCards, X } from 'lucide-react';
 import { calc, money, monthLabel, num, zbpQrPayload } from '../utils';
 import { Row } from './common';
 
-function PayQrModal({ settings, total, month, onClose }) {
+export function PayQrModal({ settings, total, month, onClose }) {
   const [qr, setQr] = useState('');
   useEffect(() => {
     const note = settings.paymentNote || `Media ${settings.apartment} ${month}`;
@@ -19,6 +19,7 @@ function PayQrModal({ settings, total, month, onClose }) {
         <p className="authSub">Zeskanuj w aplikacji banku (George, mBank, PKO…) — kwota i odbiorca wypełnią się same.</p>
         {qr && <img className="qrImg" src={qr} alt="QR płatności" />}
         <div className="grand"><span>{settings.payeeName}</span><b>{money(total)}</b></div>
+        <small className="qrMonth">{monthLabel(month)}</small>
       </div>
     </div>
   );
