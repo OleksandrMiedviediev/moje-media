@@ -39,6 +39,7 @@ export default function App() {
   const [customReadings, setCustomReadings] = useState({});
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
+  const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
 
   useEffect(() => localStorage.setItem('mb-tab', tab), [tab]);
