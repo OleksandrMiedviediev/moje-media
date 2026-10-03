@@ -26,8 +26,13 @@ export function SettingsTab({
     });
   };
 
-  const removeItem = id => {
-    setSettings({ ...settings, customItems: items.filter(i => i.id !== id) });
+  const removeItem = async id => {
+    const item = items.find(i => i.id === id);
+    if (!confirm(`Usunąć „${item?.name || 'pozycję'}”? Stare miesiące zachowają tę pozycję w historii.`)) return;
+    const next = items.filter(i => i.id !== id);
+    setSettings({ ...settings, customItems: next });
+    // Сразу сохранить на сервер
+    try { await onSaveSettings({ ...settings, customItems: next }); } catch { /* ignore */ }
   };
 
   // Валидация: название обязательно, числа >= 0
@@ -65,7 +70,7 @@ export function SettingsTab({
           <div className="customItem" key={item.id}>
             <div className="customHead">
               <span className={`badge ${item.type}`}>{item.type === 'meter' ? 'Licznik' : 'Stała'}</span>
-              <button className="eye danger" onClick={() => removeItem(item.id)}><Trash2 size={15} /></button>
+              <button className="removeBtn" onClick={() => removeItem(item.id)}><Trash2 size={14} />Usuń</button>
             </div>
             <div className="grid">
               <Field label="Nazwa" value={item.name} onChange={v => updateItem(item.id, { name: v })} />
