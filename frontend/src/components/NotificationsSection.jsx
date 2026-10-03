@@ -22,14 +22,15 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
     const next = [...(settings.notifications || []), { id, type: newType, day: Number(newDay), time: newTime, active: true }];
     const updatedApt = { ...settings, notifications: next };
     setSettings({ notifications: next });
-    await save(updatedApt);
+    // Ждём обновления state, потом сохраняем
+    setTimeout(() => save(updatedApt), 0);
   };
 
   const updateNotif = async (id, patch) => {
     const next = (settings.notifications || []).map(n => n.id === id ? { ...n, ...patch } : n);
     const updatedApt = { ...settings, notifications: next };
     setSettings({ notifications: next });
-    await save(updatedApt);
+    setTimeout(() => save(updatedApt), 0);
   };
 
   const removeNotif = async id => {
@@ -37,7 +38,7 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, al
     const next = (settings.notifications || []).filter(n => n.id !== id);
     const updatedApt = { ...settings, notifications: next };
     setSettings({ notifications: next });
-    await save(updatedApt);
+    setTimeout(() => save(updatedApt), 0);
   };
 
   const requestPermission = async () => {
