@@ -55,3 +55,5 @@ input[type="month"]{appearance:none;-webkit-appearance:none;min-height:44px}
 .badge.fixed{background:#f0fdf4;color:#15803d}
 .danger{color:#b91c1c}
 button:disabled{opacity:.5;cursor:not-allowed}
+.checkRow{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px;color:#4a5568;cursor:pointer}
+.checkRow input{width:auto;margin:0;accent-color:#356ae6;cursor:pointer}

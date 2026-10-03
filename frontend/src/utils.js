@@ -6,7 +6,7 @@ export const monthNow = () => new Date().toISOString().slice(0, 7);
 
 export const monthLabel = m => new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(new Date(`${m}-01T00:00:00`));
 
-export const calc = (water, prev, settings, tariffs, customReadings = {}) => {
+export const calc = (water, prev, settings, tariffs, customReadings = {}, newMeters = {}) => {
   const usage = Math.max(0, num(water) - num(prev));
   const variable = usage * (num(tariffs.coldWater) + num(tariffs.sewage));
   const fixed = num(tariffs.wastePerPerson) * num(settings.residents)
@@ -33,7 +33,7 @@ export const calc = (water, prev, settings, tariffs, customReadings = {}) => {
     if (!item.active) return;
     if (item.type === 'meter') {
       const curr = num(customReadings[item.id]);
-      const prevVal = num(item.lastValue);
+      const prevVal = newMeters[item.id] ? 0 : num(item.lastValue); // новый счётчик — от нуля
       const itemUsage = Math.max(0, curr - prevVal);
       const cost = itemUsage * num(item.rate);
       custom[item.id] = { usage: itemUsage, cost, name: item.name, unit: item.unit };
