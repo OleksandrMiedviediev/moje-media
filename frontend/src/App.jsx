@@ -22,7 +22,6 @@ export default function App() {
   const [tab, setTab] = useState(() => localStorage.getItem('mb-tab') || 'home');
   const [tariffMonth, setTariffMonth] = useState(monthNow());
   const [status, setStatus] = useState('');
-  const [lastSaved, setLastSaved] = useState(null);
 
   useEffect(() => localStorage.setItem('mb-tab', tab), [tab]);
 
@@ -59,7 +58,6 @@ export default function App() {
     if (!water) { setStatus('Wpisz aktualne wskazanie wody.'); return; }
     const payload = entryPayload(month, previousWater, water, result, selectedTariff);
     setEntries([...entries.filter(e => e.month !== month), payload]);
-    setLastSaved({ month, total: result.total });
     setEditing(null); setWater('');
     if (API) {
       try { await apiPut(`/api/entries/${month}`, payload); setStatus('Zapisano miesiąc.'); }
@@ -132,8 +130,7 @@ export default function App() {
             settings={settings}
             selectedTariff={selectedTariff}
             onSave={saveEntry}
-            lastSavedTotal={lastSaved?.total}
-            lastSavedMonth={lastSaved?.month}
+            savedEntry={entries.find(e => e.month === month)}
           />
         )}
         {tab === 'history' && (

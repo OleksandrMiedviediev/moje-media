@@ -27,12 +27,13 @@ export function PayQrModal({ settings, total, month, onClose }) {
 
 export function HomeTab({
   month, setMonth, water, setWater, editing, setEditing,
-  previousWater, settings, selectedTariff, onSave, lastSavedTotal, lastSavedMonth
+  previousWater, settings, selectedTariff, onSave, savedEntry
 }) {
   const result = calc(water, previousWater, settings, selectedTariff);
   const [showQr, setShowQr] = useState(false);
-  const justSaved = lastSavedMonth === month && !water && !editing;
-  const displayTotal = justSaved ? lastSavedTotal : result.total;
+  // После сохранения (поле пустое, не в режиме редактирования) — показываем сохранённую сумму
+  const justSaved = savedEntry && !water && !editing;
+  const displayTotal = justSaved ? num(savedEntry.total) : result.total;
   const canPay = settings.payeeIban && settings.payeeName && displayTotal > 0;
 
   return (
