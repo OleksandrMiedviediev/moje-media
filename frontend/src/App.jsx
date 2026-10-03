@@ -342,6 +342,7 @@ export default function App() {
             setAllSettings={setSettings}
             getAllSettings={() => settingsRef.current}
             registerPush={registerPush}
+            setStatus={setStatus}
           />
         )}
       </main>

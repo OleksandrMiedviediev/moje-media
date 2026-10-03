@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Bell, Plus, Trash2 } from 'lucide-react';
+import { Bell, Plus, Trash2, Zap } from 'lucide-react';
 import { Field } from './common';
+import { apiPost } from '../api';
 
 const NOTIF_TYPES = [
   { id: 'reading', name: 'Wpisz wskazania' },
   { id: 'payment', name: 'Do zapłaty' }
 ];
 
-export function NotificationsSection({ settings, setSettings, onSaveSettings, getAllSettings, activeApartmentId, registerPush }) {
+export function NotificationsSection({ settings, setSettings, onSaveSettings, getAllSettings, activeApartmentId, registerPush, setStatus }) {
   const notifs = settings.notifications || [];
   const [newType, setNewType] = useState('reading');
   const [newDay, setNewDay] = useState('25');
@@ -44,13 +45,28 @@ export function NotificationsSection({ settings, setSettings, onSaveSettings, ge
     setTimeout(() => save(updatedApt), 0);
   };
 
+  const testPush = async () => {
+    try {
+      setStatus('Wysyłam test...');
+      await apiPost('/api/push/test');
+      setStatus('Test wysłany — sprawdź telefon');
+    } catch (e) {
+      setStatus(`Błąd testu: ${e.message}`);
+    }
+  };
+
   return (
     <section className="card">
       <h2><Bell />Powiadomienia</h2>
       <p>Przypomnienia o wpisaniu wskazań lub płatności — push na telefon.</p>
-      <button className="secondary" onClick={registerPush} style={{ marginBottom: '12px' }}>
-        <Bell size={16} /> Włącz powiadomienia push
-      </button>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <button className="secondary" onClick={registerPush}>
+          <Bell size={16} /> Włącz powiadomienia push
+        </button>
+        <button className="secondary" onClick={testPush} style={{ background: '#fef3c7', color: '#92400e' }}>
+          <Zap size={16} /> TEST PUSH
+        </button>
+      </div>
 
       {notifs.length === 0 && <p className="authSub" style={{ margin: '8px 0' }}>Brak przypomnień. Dodaj pierwsze.</p>}
       {notifs.map(n => (

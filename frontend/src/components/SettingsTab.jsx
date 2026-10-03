@@ -9,7 +9,7 @@ const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 export function SettingsTab({
   settings, setSettings, allSettings, apartments, activeApartmentId, onAddApartment, onRemoveApartment,
   tariffs, tariffMonth, setTariffMonth,
-  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onDeleteTariff, onLogout, dark, setDark, setAllSettings, getAllSettings, registerPush
+  activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onDeleteTariff, onLogout, dark, setDark, setAllSettings, getAllSettings, registerPush, setStatus
 }) {
   const items = settings.customItems || [];
 
@@ -134,7 +134,7 @@ export function SettingsTab({
         <button className="secondary" onClick={onSaveSettings}>Zapisz dane</button>
       </section>
 
-      <NotificationsSection settings={settings} setSettings={setSettings} onSaveSettings={onSaveSettings} getAllSettings={getAllSettings} activeApartmentId={activeApartmentId} registerPush={registerPush} />
+      <NotificationsSection settings={settings} setSettings={setSettings} onSaveSettings={onSaveSettings} getAllSettings={getAllSettings} activeApartmentId={activeApartmentId} registerPush={registerPush} setStatus={setStatus} />
 
       <section className="card">
         <div className="cardHead">
