@@ -276,6 +276,7 @@ export default function App() {
             onUpdateTariff={updateTariff}
             onLogout={logout}
             dark={dark} setDark={setDark}
+            setAllSettings={setSettings}
           />
         )}
       </main>
