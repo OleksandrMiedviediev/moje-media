@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Home, Moon, Settings, Sun, WalletCards, X } from 'lucide-react';
 import { API, DEFAULT_SETTINGS, DEFAULT_TARIFFS } from './constants';
-import { apiDelete, apiGet, apiPost, apiPut } from './api';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from './api';
 import { monthNow, num } from './utils';
 import { AuthScreen, OnboardingScreen } from './components/Auth';
 import { HomeTab, entryPayload } from './components/HomeTab';
@@ -157,6 +157,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const togglePaid = async e => {
+    if (e.shared || String(e.apartmentId || '').startsWith('shared:')) { setStatus('Tylko właściciel może oznaczać płatności.'); return; }
+    const paid = !e.paid;
+    try {
+      if (API) await apiPatch(`/api/entries/${e.month}/payment`, { apartmentId: e.apartmentId || settings.activeApartmentId || 'a1', paid });
+      setEntries(current => current.map(row => row.month === e.month && row.apartmentId === e.apartmentId ? { ...row, paid, paidAt: paid ? new Date().toISOString() : null } : row));
+      setStatus(paid ? 'Oznaczono jako opłacone.' : 'Cofnięto status płatności.');
+    } catch (e2) { setStatus(e2.response?.data?.error || 'Nie udało się zmienić statusu płatności.'); }
+  };
+
   const removeEntry = async e => {
     if (!confirm(`Usunąć ${e.month}?`)) return;
     const apartmentId = e.apartmentId || 'a1';
@@ -259,6 +269,8 @@ export default function App() {
             settings={activeApartment}
             onEdit={editEntry}
             onRemove={removeEntry}
+            onTogglePaid={togglePaid}
+            isOwner={!activeApartment?.shared}
           />
         )}
         {tab === 'settings' && (

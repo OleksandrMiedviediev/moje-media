@@ -63,17 +63,31 @@ const entrySchema = new mongoose.Schema({
   total: { type: Number, default: 0 },
   breakdown: { type: Object, default: {} },
   tariffs: { type: Object, default: {} },
-  note: { type: String, default: '' }
+  custom: { type: Object, default: {} },
+  customReadings: { type: Object, default: {} },
+  note: { type: String, default: '' },
+  paid: { type: Boolean, default: false },
+  paidAt: { type: Date, default: null },
+  paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 entrySchema.index({ userId: 1, apartmentId: 1, month: 1 }, { unique: true });
 const settingsSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   value: { type: Object }
 }, { timestamps: true });
+const apartmentAccessSchema = new mongoose.Schema({
+  ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  apartmentId: { type: String, required: true },
+  memberUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
+  role: { type: String, enum: ['resident'], default: 'resident' }
+}, { timestamps: true });
+apartmentAccessSchema.index({ ownerUserId: 1, apartmentId: 1, memberUserId: 1 }, { unique: true });
 const User = mongoose.model('User', userSchema);
 const Tariff = mongoose.model('Tariff', tariffSchema);
 const Entry = mongoose.model('Entry', entrySchema);
 const Setting = mongoose.model('Setting', settingsSchema);
+const ApartmentAccess = mongoose.model('ApartmentAccess', apartmentAccessSchema);
 
 const defaultSettings = {
   apartment: '', area: 0, residents: 1,
@@ -132,6 +146,79 @@ const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isMonth = m => /^\d{4}-\d{2}$/.test(m);
 const isNum = v => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) < 1e9;
 const isShortStr = (v, max = 200) => typeof v === 'string' && v.length <= max;
+
+const sharedApartmentKey = (ownerUserId, apartmentId) => `shared:${ownerUserId}:${apartmentId}`;
+const getApartments = value => Array.isArray(value?.apartments) ? value.apartments : (value?.apartment ? [{ id: 'a1', name: value.apartment, area: value.area || 0, residents: value.residents || 1, customItems: [], tariffs: null }] : []);
+async function resolveApartmentScope(user, requestedId) {
+  const id = String(requestedId || 'a1');
+  if (!id.startsWith('shared:')) {
+    const ownSettings = await Setting.findOne({ userId: user._id });
+    const ownedApartment = getApartments(ownSettings?.value).find(a => a.id === id);
+    if (!ownedApartment) return null;
+    return { ownerUserId: user._id, apartmentId: id, shared: false, role: 'owner' };
+  }
+  const parts = id.split(':');
+  if (parts.length !== 3 || !mongoose.isValidObjectId(parts[1]) || !parts[2]) return null;
+  const access = await ApartmentAccess.findOne({ ownerUserId: parts[1], apartmentId: parts[2], memberUserId: user._id });
+  if (!access) return null;
+  const ownerSettings = await Setting.findOne({ userId: access.ownerUserId });
+  const apartment = getApartments(ownerSettings?.value).find(a => a.id === access.apartmentId);
+  if (!apartment) return null;
+  return { ownerUserId: access.ownerUserId, apartmentId: access.apartmentId, shared: true, role: 'resident' };
+}
+
+const toNumber = value => Number(String(value ?? '').replace(',', '.')) || 0;
+async function calculateSharedEntry(scope, month, body) {
+  const settingsDoc = await Setting.findOne({ userId: scope.ownerUserId });
+  const apartment = getApartments(settingsDoc?.value).find(a => a.id === scope.apartmentId);
+  if (!apartment) throw new Error('Mieszkanie nie istnieje');
+  const previousEntry = await Entry.findOne({
+    userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: { $lt: month }
+  }).sort({ month: -1 }).lean();
+  const lastWater = previousEntry ? toNumber(previousEntry.currentWater) : 0;
+  const currentWater = toNumber(body.currentWater);
+  const previousWater = previousEntry && currentWater >= lastWater ? lastWater : 0;
+  const usage = Math.max(0, currentWater - previousWater);
+  const tariffRecord = (apartment.tariffs || []).filter(t => t.effectiveFrom <= month).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
+  const tariffs = tariffRecord?.values || defaultTariffs;
+  const rate = key => {
+    const value = tariffs[key];
+    if (value && typeof value === 'object') return value.active === false ? 0 : toNumber(value.value);
+    return toNumber(value);
+  };
+  const breakdown = {
+    water: usage * rate('coldWater'),
+    sewage: usage * rate('sewage'),
+    waste: rate('wastePerPerson') * toNumber(apartment.residents),
+    maintenance: rate('maintenancePerM2') * toNumber(apartment.area),
+    administration: rate('administrationPerM2') * toNumber(apartment.area),
+    cleaning: rate('cleaning'),
+    light: rate('stairLightPerPerson') * toNumber(apartment.residents),
+    renovation: rate('renovationPerM2') * toNumber(apartment.area)
+  };
+  const customReadings = sanitize(body.customReadings || {});
+  const custom = {};
+  let customTotal = 0;
+  for (const item of (apartment.customItems || [])) {
+    if (!item.active) continue;
+    if (item.type === 'meter') {
+      if (customReadings[item.id] === undefined || customReadings[item.id] === '') continue;
+      const current = toNumber(customReadings[item.id]);
+      const last = previousEntry?.customReadings?.[item.id] !== undefined
+        ? toNumber(previousEntry.customReadings[item.id]) : toNumber(item.lastValue);
+      const itemUsage = Math.max(0, current - (current >= last ? last : 0));
+      const cost = itemUsage * toNumber(item.rate);
+      custom[item.id] = { usage: itemUsage, cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    } else {
+      const cost = toNumber(item.amount);
+      custom[item.id] = { cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    }
+  }
+  const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0) + customTotal;
+  return { previousWater, currentWater, usage, total, breakdown, tariffs, custom, customReadings };
+}
 
 // Whitelist полей записи месяца — только эти поля сохраняются
 const ENTRY_FIELDS = ['month', 'previousWater', 'currentWater', 'usage', 'total', 'breakdown', 'tariffs', 'note', 'custom', 'customReadings'];
@@ -253,12 +340,27 @@ app.get('/api/health', (_, res) => res.json({ ok: true, database: mongoose.conne
 app.get('/api/settings', auth, async (req, res) => {
   try {
     const doc = await Setting.findOne({ userId: req.user._id });
-    res.json(doc?.value || defaultSettings);
+    const value = doc?.value || defaultSettings;
+    const apartments = getApartments(value);
+    const accesses = await ApartmentAccess.find({ memberUserId: req.user._id }).lean();
+    const sharedApartments = [];
+    for (const access of accesses) {
+      const ownerSettings = await Setting.findOne({ userId: access.ownerUserId });
+      const apartment = getApartments(ownerSettings?.value).find(a => a.id === access.apartmentId);
+      if (apartment) sharedApartments.push({ ...apartment, id: sharedApartmentKey(access.ownerUserId.toString(), access.apartmentId), sourceApartmentId: access.apartmentId, ownerUserId: access.ownerUserId.toString(), shared: true, role: 'resident' });
+    }
+    const ownActive = apartments.some(a => a.id === value.activeApartmentId) ? value.activeApartmentId : apartments[0]?.id;
+    res.json({ ...value, apartments: [...apartments, ...sharedApartments], activeApartmentId: ownActive || sharedApartments[0]?.id || 'a1' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.put('/api/settings', auth, async (req, res) => {
   try {
-    const doc = await Setting.findOneAndUpdate({ userId: req.user._id }, { value: sanitize(req.body) }, { upsert: true, new: true });
+    const value = sanitize(req.body);
+    if (Array.isArray(value.apartments)) value.apartments = value.apartments.filter(a => !a.shared && !String(a.id || '').startsWith('shared:'));
+    if (value.activeApartmentId && String(value.activeApartmentId).startsWith('shared:')) {
+      return res.status(403).json({ error: 'Mieszkańca nie można używać do zmiany ustawień właściciela' });
+    }
+    const doc = await Setting.findOneAndUpdate({ userId: req.user._id }, { value }, { upsert: true, new: true });
     res.json(doc.value);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -282,29 +384,87 @@ app.put('/api/tariffs', auth, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.delete('/api/tariffs/:id', auth, async (req, res) => { try { if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Złe id' }); await Tariff.findOneAndDelete({ _id: req.params.id, userId: req.user._id }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
-app.get('/api/entries', auth, async (req, res) => { try { res.json(await Entry.find({ userId: req.user._id }).sort({ month: -1 })); } catch (e) { res.status(500).json({ error: e.message }); } });
+app.get('/api/entries', auth, async (req, res) => {
+  try {
+    const ownEntries = await Entry.find({ userId: req.user._id }).sort({ month: -1 }).lean();
+    const accesses = await ApartmentAccess.find({ memberUserId: req.user._id }).lean();
+    const sharedEntries = [];
+    for (const access of accesses) {
+      const rows = await Entry.find({ userId: access.ownerUserId, apartmentId: access.apartmentId }).sort({ month: -1 }).lean();
+      for (const row of rows) sharedEntries.push({ ...row, apartmentId: sharedApartmentKey(access.ownerUserId.toString(), access.apartmentId), sourceApartmentId: access.apartmentId, ownerUserId: access.ownerUserId.toString(), shared: true, role: 'resident' });
+    }
+    res.json([...ownEntries, ...sharedEntries].sort((a, b) => b.month.localeCompare(a.month)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.put('/api/entries/:month', auth, async (req, res) => {
   try {
     if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
     const body = pickEntry(req.body);
     if (!Object.keys(body).length) return res.status(400).json({ error: 'Brak danych' });
-    const apartmentId = String(req.body.apartmentId || 'a1');
+    const scope = await resolveApartmentScope(req.user, req.body.apartmentId || 'a1');
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do tego mieszkania' });
+    if (scope.shared && body.currentWater === undefined) return res.status(400).json({ error: 'Podaj aktualne wskazanie wody' });
+    const values = scope.shared ? await calculateSharedEntry(scope, req.params.month, body) : body;
     const doc = await Entry.findOneAndUpdate(
-      { userId: req.user._id, apartmentId, month: req.params.month },
-      { ...body, apartmentId },
+      { userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month },
+      { ...values, month: req.params.month, userId: scope.ownerUserId, apartmentId: scope.apartmentId, ...(body.note !== undefined ? { note: body.note } : {}) },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    res.json(doc);
+    res.json({ ...doc.toObject(), apartmentId: String(req.body.apartmentId || 'a1'), ...(scope.shared ? { shared: true, role: 'resident', sourceApartmentId: scope.apartmentId, ownerUserId: scope.ownerUserId.toString() } : {}) });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.delete('/api/entries/:month', auth, async (req, res) => {
   try {
     if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
-    const apartmentId = String(req.query.apartmentId || '');
-    if (!isShortStr(apartmentId, 120) || !apartmentId.trim()) {
-      return res.status(400).json({ error: 'apartmentId is required' });
-    }
-    await Entry.findOneAndDelete({ userId: req.user._id, apartmentId, month: req.params.month });
+    const scope = await resolveApartmentScope(req.user, req.query.apartmentId);
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do tego mieszkania' });
+    if (scope.shared) return res.status(403).json({ error: 'Tylko właściciel może usuwać rozliczenia' });
+    await Entry.findOneAndDelete({ userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month });
+    res.sendStatus(204);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.patch('/api/entries/:month/payment', auth, async (req, res) => {
+  try {
+    if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+    const apartmentId = String(req.body.apartmentId || 'a1');
+    if (apartmentId.startsWith('shared:')) return res.status(403).json({ error: 'Tylko właściciel może oznaczać płatności' });
+    if (typeof req.body.paid !== 'boolean') return res.status(400).json({ error: 'paid must be boolean' });
+    const update = { paid: req.body.paid, paidAt: req.body.paid ? new Date() : null, paidBy: req.body.paid ? req.user._id : null };
+    const entry = await Entry.findOneAndUpdate({ userId: req.user._id, apartmentId, month: req.params.month }, { $set: update }, { new: true });
+    if (!entry) return res.status(404).json({ error: 'Rozliczenie nie istnieje' });
+    res.json({ ok: true, paid: entry.paid, paidAt: entry.paidAt });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.get('/api/apartments/:apartmentId/members', auth, async (req, res) => {
+  try {
+    const doc = await Setting.findOne({ userId: req.user._id });
+    const apartment = getApartments(doc?.value).find(a => a.id === req.params.apartmentId);
+    if (!apartment) return res.status(404).json({ error: 'Mieszkanie nie istnieje lub nie masz uprawnień' });
+    const members = await ApartmentAccess.find({ ownerUserId: req.user._id, apartmentId: req.params.apartmentId }).populate('memberUserId', 'email').lean();
+    res.json(members.map(m => ({ id: m._id, email: m.memberUserId?.email || m.email, role: m.role, createdAt: m.createdAt })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/apartments/:apartmentId/members', auth, async (req, res) => {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    if (!validEmail(email)) return res.status(400).json({ error: 'Nieprawidłowy adres e-mail' });
+    const doc = await Setting.findOne({ userId: req.user._id });
+    const apartment = getApartments(doc?.value).find(a => a.id === req.params.apartmentId);
+    if (!apartment) return res.status(404).json({ error: 'Mieszkanie nie istnieje lub nie masz uprawnień' });
+    if (email === req.user.email) return res.status(400).json({ error: 'Nie możesz udostępnić mieszkania samemu sobie' });
+    const member = await User.findOne({ email });
+    if (!member || !member.verified) return res.status(404).json({ error: 'Użytkownik musi najpierw założyć konto i potwierdzić e-mail' });
+    const existing = await ApartmentAccess.findOne({ ownerUserId: req.user._id, apartmentId: req.params.apartmentId, memberUserId: member._id });
+    if (existing) return res.status(409).json({ error: 'Ten użytkownik ma już dostęp' });
+    const access = await ApartmentAccess.create({ ownerUserId: req.user._id, apartmentId: req.params.apartmentId, memberUserId: member._id, email, role: 'resident' });
+    try { await sendEmail(email, 'Moje Media — udostępniono mieszkanie', `Właściciel udostępnił Ci mieszkanie „${apartment.name || apartment.apartment || 'Mieszkanie'}”. Zaloguj się do Moje Media, aby zobaczyć wspólną historię i dodawać wskazania.`); } catch (e) { console.error('Access notification error:', e.message); }
+    res.status(201).json({ id: access._id, email, role: access.role });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.delete('/api/apartments/:apartmentId/members/:memberId', auth, async (req, res) => {
+  try {
+    const result = await ApartmentAccess.findOneAndDelete({ _id: req.params.memberId, ownerUserId: req.user._id, apartmentId: req.params.apartmentId });
+    if (!result) return res.status(404).json({ error: 'Dostęp nie istnieje' });
     res.sendStatus(204);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
