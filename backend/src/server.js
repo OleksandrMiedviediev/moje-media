@@ -149,7 +149,12 @@ const sharedApartmentKey = (ownerUserId, apartmentId) => `shared:${ownerUserId}:
 const getApartments = value => Array.isArray(value?.apartments) ? value.apartments : (value?.apartment ? [{ id: 'a1', name: value.apartment, area: value.area || 0, residents: value.residents || 1, customItems: [], tariffs: null }] : []);
 async function resolveApartmentScope(user, requestedId) {
   const id = String(requestedId || 'a1');
-  if (!id.startsWith('shared:')) return { ownerUserId: user._id, apartmentId: id, shared: false, role: 'owner' };
+  if (!id.startsWith('shared:')) {
+    const ownSettings = await Setting.findOne({ userId: user._id });
+    const ownedApartment = getApartments(ownSettings?.value).find(a => a.id === id);
+    if (!ownedApartment) return null;
+    return { ownerUserId: user._id, apartmentId: id, shared: false, role: 'owner' };
+  }
   const parts = id.split(':');
   if (parts.length !== 3 || !mongoose.isValidObjectId(parts[1]) || !parts[2]) return null;
   const access = await ApartmentAccess.findOne({ ownerUserId: parts[1], apartmentId: parts[2], memberUserId: user._id });
