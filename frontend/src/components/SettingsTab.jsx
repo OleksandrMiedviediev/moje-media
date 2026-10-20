@@ -5,6 +5,7 @@ import { money, num } from '../utils';
 import { Field } from './common';
 import { NotificationsSection } from './NotificationsSection';
 import { apiDelete, apiGet, apiPost } from '../api';
+import { apiDelete, apiGet, apiPost } from '../api';
 
 const UNITS = ['m³', 'kWh', 'GJ', 'zł'];
 
@@ -13,6 +14,43 @@ export function SettingsTab({
   tariffs, tariffMonth, setTariffMonth,
   activeTariff, onSaveSettings, onSaveTariff, onUpdateTariff, onDeleteTariff, onLogout, dark, setDark, setAllSettings, getAllSettings, registerPush, setStatus
 }) {
+  const [memberEmail, setMemberEmail] = useState('');
+  const [members, setMembers] = useState([]);
+  const [membersError, setMembersError] = useState('');
+  const [membersBusy, setMembersBusy] = useState(false);
+  const isSharedApartment = !!settings.shared || String(activeApartmentId || '').startsWith('shared:');
+
+  useEffect(() => {
+    if (!activeApartmentId || isSharedApartment) { setMembers([]); return; }
+    let cancelled = false;
+    apiGet('/api/apartments/' + encodeURIComponent(activeApartmentId) + '/members')
+      .then(data => { if (!cancelled) setMembers(data); })
+      .catch(() => { if (!cancelled) setMembers([]); });
+    return () => { cancelled = true; };
+  }, [activeApartmentId, isSharedApartment]);
+
+  const inviteMember = async e => {
+    e.preventDefault(); setMembersError(''); setMembersBusy(true);
+    try {
+      const member = await apiPost('/api/apartments/' + encodeURIComponent(activeApartmentId) + '/members', { email: memberEmail });
+      setMembers(current => [...current, member]); setMemberEmail('');
+      setStatus?.('Dostęp do mieszkania został przyznany.');
+    } catch (error) { setMembersError(error.response?.data?.error || 'Nie udało się przyznać dostępu.'); }
+    finally { setMembersBusy(false); }
+  };
+
+  const revokeMember = async member => {
+    if (!confirm('Odebrać dostęp użytkownikowi ' + member.email + '?')) return;
+    try {
+      await apiDelete('/api/apartments/' + encodeURIComponent(activeApartmentId) + '/members/' + encodeURIComponent(member.id));
+      setMembers(current => current.filter(m => m.id !== member.id));
+    } catch (error) { setMembersError(error.response?.data?.error || 'Nie udało się odebrać dostępu.'); }
+  };
+
+  if (isSharedApartment) {
+    return <section className="card"><h2><Users />Dostęp do mieszkania</h2><p>Masz rolę mieszkańca. Możesz przeglądać wspólną historię i dodawać lub poprawiać wskazania. Ustawienia, taryfy i statusy płatności kontroluje właściciel.</p><div className="aptRow"><div><b>{settings.name}</b><small>{num(settings.area).toFixed(2).replace('.', ',')} m² · {num(settings.residents)} os.</small></div><span className="badge meter">Mieszkaniec</span></div><button className="secondary logout" onClick={onLogout}><LogOut size={16} />Wyloguj się</button></section>;
+  }
+
   const [memberEmail, setMemberEmail] = useState('');
   const [members, setMembers] = useState([]);
   const [membersError, setMembersError] = useState('');
@@ -120,6 +158,16 @@ export function SettingsTab({
         </form>
         {membersError && <div className="authErr">{membersError}</div>}
         <div className="aptList">{members.length === 0 ? <p className="authSub">Nie dodano jeszcze mieszkańców.</p> : members.map(member => <div className="aptRow" key={member.id}><div><b>{member.email}</b><small>Rola: mieszkaniec · dostęp do wspólnej historii</small></div><button className="removeBtn" onClick={() => revokeMember(member)}><Trash2 size={14} />Odbierz доступ</button></div>)}</div>
+      </section>
+
+      <section className="card">
+        <div className="cardHead"><div><h2><Users />Dostęp dla mieszkańców</h2><p>Wprowadź e-mail użytkownika, który ma już konto i potwierdził adres e-mail.</p></div></div>
+        <form onSubmit={inviteMember} className="grid">
+          <label>E-mail użytkownika<input type="email" required value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="mieszkaniec@example.com" /></label>
+          <button className="secondary" type="submit" disabled={membersBusy || !memberEmail.trim()}><UserPlus size={16} />{membersBusy ? 'Dodawanie…' : 'Przyznaj dostęp'}</button>
+        </form>
+        {membersError && <div className="authErr">{membersError}</div>}
+        <div className="aptList">{members.length === 0 ? <p className="authSub">Nie dodano jeszcze mieszkańców.</p> : members.map(member => <div className="aptRow" key={member.id}><div><b>{member.email}</b><small>Rola: mieszkaniec · dostęp do wspólnej historii</small></div><button className="removeBtn" onClick={() => revokeMember(member)}><Trash2 size={14} />Odbierz dostęp</button></div>)}</div>
       </section>
 
       <section className="card">
