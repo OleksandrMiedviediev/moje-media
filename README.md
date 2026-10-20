@@ -40,6 +40,13 @@ Aplikacja do domowych rozliczeń mediów: woda, ścieki i opłaty stałe. Rejest
 - automatycznie wypełnia: numer konta, NIP odbiorcy, kwotę, tytuł przelewu;
 - przycisk „Zapłać” przy bieżącym miesiącu i przy każdym miesiącu w historii.
 
+### 👥 Dostęp dla mieszkańców
+
+- właściciel może udostępnić wybrane mieszkanie użytkownikowi z potwierdzonym kontem po adresie e-mail;
+- mieszkańcy widzą wspólną historię, rozliczenia i statusy płatności oraz mogą dodawać i poprawiać wskazania;
+- tylko właściciel może zmieniać taryfy i ustawienia, usuwać rozliczenia, zarządzać dostępem i oznaczać rachunki jako opłacone;
+- właściciel może w dowolnym momencie odebrać dostęp.
+
 ### 🏠 Wiele mieszkań
 
 - dodaj kolejne adresy w Ustawieniach → Mieszkania;
