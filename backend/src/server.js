@@ -63,6 +63,8 @@ const entrySchema = new mongoose.Schema({
   total: { type: Number, default: 0 },
   breakdown: { type: Object, default: {} },
   tariffs: { type: Object, default: {} },
+  custom: { type: Object, default: {} },
+  customReadings: { type: Object, default: {} },
   note: { type: String, default: '' },
   paid: { type: Boolean, default: false },
   paidAt: { type: Date, default: null },
@@ -163,6 +165,59 @@ async function resolveApartmentScope(user, requestedId) {
   const apartment = getApartments(ownerSettings?.value).find(a => a.id === access.apartmentId);
   if (!apartment) return null;
   return { ownerUserId: access.ownerUserId, apartmentId: access.apartmentId, shared: true, role: 'resident' };
+}
+
+const toNumber = value => Number(String(value ?? '').replace(',', '.')) || 0;
+async function calculateSharedEntry(scope, month, body) {
+  const settingsDoc = await Setting.findOne({ userId: scope.ownerUserId });
+  const apartment = getApartments(settingsDoc?.value).find(a => a.id === scope.apartmentId);
+  if (!apartment) throw new Error('Mieszkanie nie istnieje');
+  const previousEntry = await Entry.findOne({
+    userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: { $lt: month }
+  }).sort({ month: -1 }).lean();
+  const lastWater = previousEntry ? toNumber(previousEntry.currentWater) : 0;
+  const currentWater = toNumber(body.currentWater);
+  const previousWater = previousEntry && currentWater >= lastWater ? lastWater : 0;
+  const usage = Math.max(0, currentWater - previousWater);
+  const tariffRecord = (apartment.tariffs || []).filter(t => t.effectiveFrom <= month).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
+  const tariffs = tariffRecord?.values || defaultTariffs;
+  const rate = key => {
+    const value = tariffs[key];
+    if (value && typeof value === 'object') return value.active === false ? 0 : toNumber(value.value);
+    return toNumber(value);
+  };
+  const breakdown = {
+    water: usage * rate('coldWater'),
+    sewage: usage * rate('sewage'),
+    waste: rate('wastePerPerson') * toNumber(apartment.residents),
+    maintenance: rate('maintenancePerM2') * toNumber(apartment.area),
+    administration: rate('administrationPerM2') * toNumber(apartment.area),
+    cleaning: rate('cleaning'),
+    light: rate('stairLightPerPerson') * toNumber(apartment.residents),
+    renovation: rate('renovationPerM2') * toNumber(apartment.area)
+  };
+  const customReadings = sanitize(body.customReadings || {});
+  const custom = {};
+  let customTotal = 0;
+  for (const item of (apartment.customItems || [])) {
+    if (!item.active) continue;
+    if (item.type === 'meter') {
+      if (customReadings[item.id] === undefined || customReadings[item.id] === '') continue;
+      const current = toNumber(customReadings[item.id]);
+      const last = previousEntry?.customReadings?.[item.id] !== undefined
+        ? toNumber(previousEntry.customReadings[item.id]) : toNumber(item.lastValue);
+      const itemUsage = Math.max(0, current - (current >= last ? last : 0));
+      const cost = itemUsage * toNumber(item.rate);
+      custom[item.id] = { usage: itemUsage, cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    } else {
+      const cost = toNumber(item.amount);
+      custom[item.id] = { cost, name: item.name, unit: item.unit };
+      customTotal += cost;
+    }
+  }
+  const total = Object.values(breakdown).reduce((sum, value) => sum + value, 0) + customTotal;
+  return { previousWater, currentWater, usage, total, breakdown, tariffs, custom, customReadings };
 }
 
 // Whitelist полей записи месяца — только эти поля сохраняются
@@ -348,9 +403,10 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     if (!Object.keys(body).length) return res.status(400).json({ error: 'Brak danych' });
     const scope = await resolveApartmentScope(req.user, req.body.apartmentId || 'a1');
     if (!scope) return res.status(403).json({ error: 'Brak dostępu do tego mieszkania' });
+    const values = scope.shared ? await calculateSharedEntry(scope, req.params.month, body) : body;
     const doc = await Entry.findOneAndUpdate(
       { userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month },
-      { ...body, userId: scope.ownerUserId, apartmentId: scope.apartmentId },
+      { ...values, userId: scope.ownerUserId, apartmentId: scope.apartmentId, ...(body.note !== undefined ? { note: body.note } : {}) },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     res.json({ ...doc.toObject(), apartmentId: String(req.body.apartmentId || 'a1'), ...(scope.shared ? { shared: true, role: 'resident', sourceApartmentId: scope.apartmentId, ownerUserId: scope.ownerUserId.toString() } : {}) });
