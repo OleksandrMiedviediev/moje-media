@@ -37,7 +37,7 @@ const exportCSV = (entries, settings) => {
   URL.revokeObjectURL(url);
 };
 
-export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove }) {
+export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove, onTogglePaid, isOwner = true }) {
   const [expanded, setExpanded] = useState(null);
   const [chartMode, setChartMode] = useState(() => localStorage.getItem('mb-chart-mode') || 'months');
   const [yearFilter, setYearFilter] = useState(() => localStorage.getItem('mb-history-year') || 'all');
@@ -253,10 +253,11 @@ export function HistoryTab({ entries, sortedEntries, settings, onEdit, onRemove 
                     {e.custom && Object.entries(e.custom).map(([id, c]) => (
                       <Row key={id} name={c.name + (c.usage !== undefined ? ` (${c.usage.toFixed(2).replace('.', ',')} ${c.unit})` : '')} value={c.cost} />
                     ))}
+                      <div className="paymentStatus"><span className={e.paid ? 'badge paid' : 'badge unpaid'}>{e.paid ? 'Opłacone' : 'Nieopłacone'}</span>{isOwner && <button className="secondary" onClick={() => onTogglePaid(e)}>{e.paid ? 'Cofnij opłatę' : 'Oznacz jako opłacone'}</button>}</div>
                       <div className="actions">
                         <button onClick={() => onEdit(e)}><Pencil size={16} />Edytuj</button>
                         {canPay && <button onClick={() => setPayFor(e)}><QrCode size={16} />Zapłać</button>}
-                        <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>
+                        {isOwner && <button className="danger" onClick={() => onRemove(e)}><Trash2 size={16} />Usuń</button>}
                       </div>
                     </div>
                   )}
