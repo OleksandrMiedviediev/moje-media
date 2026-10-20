@@ -297,7 +297,17 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     res.json(doc);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
-app.delete('/api/entries/:month', auth, async (req, res) => { try { if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' }); await Entry.findOneAndDelete({ userId: req.user._id, month: req.params.month }); res.sendStatus(204); } catch (e) { res.status(400).json({ error: e.message }); } });
+app.delete('/api/entries/:month', auth, async (req, res) => {
+  try {
+    if (!isMonth(req.params.month)) return res.status(400).json({ error: 'month must be YYYY-MM' });
+    const apartmentId = String(req.query.apartmentId || '');
+    if (!isShortStr(apartmentId, 120) || !apartmentId.trim()) {
+      return res.status(400).json({ error: 'apartmentId is required' });
+    }
+    await Entry.findOneAndDelete({ userId: req.user._id, apartmentId, month: req.params.month });
+    res.sendStatus(204);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
 
 // === PUSH ===
 app.get('/api/push/vapid-key', (_, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));
