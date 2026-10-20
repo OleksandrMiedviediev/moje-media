@@ -13,3 +13,5 @@ export async function apiPost(path, data) { return (await axios.post(`${API}${pa
 export async function apiDelete(path) { return axios.delete(`${API}${path}`); }
 
 export async function apiPatch(path, data) { return (await axios.patch(`${API}${path}`, data)).data; }
+
+export async function apiPatch(path, data) { return (await axios.patch(`${API}${path}`, data)).data; }
