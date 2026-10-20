@@ -431,12 +431,14 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     const scope = await resolveApartmentScope(req.user, req.body.apartmentId || 'a1');
     if (!scope) return res.status(403).json({ error: 'Brak dostępu do tego mieszkania' });
     if (scope.shared && body.currentWater === undefined) return res.status(400).json({ error: 'Podaj aktualne wskazanie wody' });
+    const previousEntry = await Entry.findOne({ userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month }).lean();
     const values = scope.shared ? await calculateSharedEntry(scope, req.params.month, body) : body;
     const doc = await Entry.findOneAndUpdate(
       { userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month },
       { ...values, month: req.params.month, userId: scope.ownerUserId, apartmentId: scope.apartmentId, ...(body.note !== undefined ? { note: body.note } : {}) },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    await logAudit({ ownerUserId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month, actor: req.user, action: previousEntry ? 'entry.updated' : 'entry.created', entityType: 'entry', entityId: doc._id.toString(), oldValue: previousEntry ? { currentWater: previousEntry.currentWater, usage: previousEntry.usage, total: previousEntry.total, customReadings: previousEntry.customReadings } : null, newValue: { currentWater: doc.currentWater, usage: doc.usage, total: doc.total, customReadings: doc.customReadings } });
     res.json({ ...doc.toObject(), apartmentId: String(req.body.apartmentId || 'a1'), ...(scope.shared ? { shared: true, role: 'resident', sourceApartmentId: scope.apartmentId, ownerUserId: scope.ownerUserId.toString() } : {}) });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
