@@ -123,16 +123,6 @@ export function SettingsTab({
       </section>
 
       <section className="card">
-        <div className="cardHead"><div><h2><Users />Dostęp dla mieszkańców</h2><p>Wprowadź e-mail użytkownika, który ma już konto i potwierdził adres e-mail.</p></div></div>
-        <form onSubmit={inviteMember} className="grid">
-          <label>E-mail użytkownika<input type="email" required value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="mieszkaniec@example.com" /></label>
-          <button className="secondary" type="submit" disabled={membersBusy || !memberEmail.trim()}><UserPlus size={16} />{membersBusy ? 'Dodawanie…' : 'Przyznaj dostęp'}</button>
-        </form>
-        {membersError && <div className="authErr">{membersError}</div>}
-        <div className="aptList">{members.length === 0 ? <p className="authSub">Nie dodano jeszcze mieszkańców.</p> : members.map(member => <div className="aptRow" key={member.id}><div><b>{member.email}</b><small>Rola: mieszkaniec · dostęp do wspólnej historii</small></div><button className="removeBtn" onClick={() => revokeMember(member)}><Trash2 size={14} />Odbierz dostęp</button></div>)}</div>
-      </section>
-
-      <section className="card">
         <h2><Home />Aktywne mieszkanie — {settings.name}</h2>
         <div className="grid">
           <Field label="Adres / nazwa" value={settings.name} onChange={v => setSettings({ name: v })} />
