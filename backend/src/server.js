@@ -71,6 +71,31 @@ const entrySchema = new mongoose.Schema({
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 entrySchema.index({ userId: 1, apartmentId: 1, month: 1 }, { unique: true });
+const paymentSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  apartmentId: { type: String, required: true, index: true },
+  month: { type: String, required: true },
+  amount: { type: Number, required: true, min: 0.01 },
+  paidAt: { type: Date, required: true, default: Date.now },
+  method: { type: String, enum: ['cash', 'bank_transfer', 'other'], default: 'bank_transfer' },
+  reference: { type: String, default: '', maxlength: 160 },
+  proofUrl: { type: String, default: '', maxlength: 1000 },
+  note: { type: String, default: '', maxlength: 500 },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+}, { timestamps: true });
+paymentSchema.index({ userId: 1, apartmentId: 1, month: 1, paidAt: -1 });
+const auditLogSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  apartmentId: { type: String, required: true, index: true },
+  month: { type: String, default: '' },
+  actorUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  actorEmail: { type: String, required: true },
+  action: { type: String, required: true },
+  entityType: { type: String, required: true },
+  entityId: { type: String, default: '' },
+  oldValue: { type: mongoose.Schema.Types.Mixed, default: null },
+  newValue: { type: mongoose.Schema.Types.Mixed, default: null }
+}, { timestamps: true });
 const settingsSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   value: { type: Object }
@@ -88,6 +113,8 @@ const Tariff = mongoose.model('Tariff', tariffSchema);
 const Entry = mongoose.model('Entry', entrySchema);
 const Setting = mongoose.model('Setting', settingsSchema);
 const ApartmentAccess = mongoose.model('ApartmentAccess', apartmentAccessSchema);
+const Payment = mongoose.model('Payment', paymentSchema);
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
 
 const defaultSettings = {
   apartment: '', area: 0, residents: 1,
@@ -404,12 +431,14 @@ app.put('/api/entries/:month', auth, async (req, res) => {
     const scope = await resolveApartmentScope(req.user, req.body.apartmentId || 'a1');
     if (!scope) return res.status(403).json({ error: 'Brak dostępu do tego mieszkania' });
     if (scope.shared && body.currentWater === undefined) return res.status(400).json({ error: 'Podaj aktualne wskazanie wody' });
+    const previousEntry = await Entry.findOne({ userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month }).lean();
     const values = scope.shared ? await calculateSharedEntry(scope, req.params.month, body) : body;
     const doc = await Entry.findOneAndUpdate(
       { userId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month },
       { ...values, month: req.params.month, userId: scope.ownerUserId, apartmentId: scope.apartmentId, ...(body.note !== undefined ? { note: body.note } : {}) },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    await logAudit({ ownerUserId: scope.ownerUserId, apartmentId: scope.apartmentId, month: req.params.month, actor: req.user, action: previousEntry ? 'entry.updated' : 'entry.created', entityType: 'entry', entityId: doc._id.toString(), oldValue: previousEntry ? { currentWater: previousEntry.currentWater, usage: previousEntry.usage, total: previousEntry.total, customReadings: previousEntry.customReadings } : null, newValue: { currentWater: doc.currentWater, usage: doc.usage, total: doc.total, customReadings: doc.customReadings } });
     res.json({ ...doc.toObject(), apartmentId: String(req.body.apartmentId || 'a1'), ...(scope.shared ? { shared: true, role: 'resident', sourceApartmentId: scope.apartmentId, ownerUserId: scope.ownerUserId.toString() } : {}) });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -435,6 +464,67 @@ app.patch('/api/entries/:month/payment', auth, async (req, res) => {
     res.json({ ok: true, paid: entry.paid, paidAt: entry.paidAt });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+const logAudit = async ({ ownerUserId, apartmentId, month = '', actor, action, entityType, entityId = '', oldValue = null, newValue = null }) => AuditLog.create({
+  userId: ownerUserId, apartmentId, month, actorUserId: actor._id, actorEmail: actor.email,
+  action, entityType, entityId, oldValue, newValue
+});
+
+app.get('/api/finance/summary', auth, async (req, res) => {
+  try {
+    const scope = await resolveApartmentScope(req.user, req.query.apartmentId || 'a1');
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do mieszkania' });
+    const entries = await Entry.find({ userId: scope.ownerUserId, apartmentId: scope.apartmentId }).sort({ month: 1 }).lean();
+    const payments = await Payment.find({ userId: scope.ownerUserId, apartmentId: scope.apartmentId }).lean();
+    const byMonth = entries.map(entry => {
+      const paid = payments.filter(p => p.month === entry.month).reduce((sum, p) => sum + p.amount, 0);
+      return { month: entry.month, billed: Number(entry.total || 0), paid: Math.min(paid, Number(entry.total || 0)), remaining: Math.max(0, Number(entry.total || 0) - paid) };
+    });
+    res.json({ billed: byMonth.reduce((sum, m) => sum + m.billed, 0), paid: byMonth.reduce((sum, m) => sum + m.paid, 0), remaining: byMonth.reduce((sum, m) => sum + m.remaining, 0), months: byMonth.slice(-12) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/apartments/:apartmentId/payments', auth, async (req, res) => {
+  try {
+    const scope = await resolveApartmentScope(req.user, req.params.apartmentId);
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do mieszkania' });
+    const payments = await Payment.find({ userId: scope.ownerUserId, apartmentId: scope.apartmentId }).sort({ paidAt: -1 }).lean();
+    res.json(payments.map(p => ({ ...p, apartmentId: req.params.apartmentId, shared: scope.shared })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/apartments/:apartmentId/payments', auth, async (req, res) => {
+  try {
+    const scope = await resolveApartmentScope(req.user, req.params.apartmentId);
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do mieszkania' });
+    if (scope.shared) return res.status(403).json({ error: 'Tylko właściciel może rejestrować płatności' });
+    const { month, amount, paidAt, method = 'bank_transfer', reference = '', proofUrl = '', note = '' } = req.body || {};
+    if (!isMonth(month) || !isNum(amount) || Number(amount) <= 0) return res.status(400).json({ error: 'Podaj prawidłowy miesiąc i kwotę większą niż 0' });
+    if (!['cash', 'bank_transfer', 'other'].includes(method)) return res.status(400).json({ error: 'Nieprawidłowy sposób płatności' });
+    if (![reference, note, proofUrl].every(v => typeof v === 'string') || reference.length > 160 || note.length > 500 || proofUrl.length > 1000) return res.status(400).json({ error: 'Dane płatności są za długie lub nieprawidłowe' });
+    if (proofUrl && !/^https:\/\//i.test(proofUrl)) return res.status(400).json({ error: 'Link potwierdzenia musi używać HTTPS' });
+    const entry = await Entry.findOne({ userId: scope.ownerUserId, apartmentId: scope.apartmentId, month }).lean();
+    if (!entry) return res.status(404).json({ error: 'Najpierw utwórz rozliczenie za ten miesiąc' });
+    const alreadyPaid = await Payment.aggregate([{ $match: { userId: scope.ownerUserId, apartmentId: scope.apartmentId, month } }, { $group: { _id: null, total: { $sum: '$amount' } } }]);
+    const remaining = Math.max(0, Number(entry.total || 0) - Number(alreadyPaid[0]?.total || 0));
+    if (Number(amount) > remaining + 0.005) return res.status(400).json({ error: 'Kwota przekracza pozostałą należność: ' + remaining.toFixed(2) + ' zł' });
+    const payment = await Payment.create({ userId: scope.ownerUserId, apartmentId: scope.apartmentId, month, amount: Number(amount), paidAt: paidAt ? new Date(paidAt) : new Date(), method, reference: reference.trim(), proofUrl: proofUrl.trim(), note: note.trim(), createdBy: req.user._id });
+    await logAudit({ ownerUserId: scope.ownerUserId, apartmentId: scope.apartmentId, month, actor: req.user, action: 'payment.created', entityType: 'payment', entityId: payment._id.toString(), newValue: { amount: payment.amount, paidAt: payment.paidAt, method: payment.method, reference: payment.reference, proofUrl: payment.proofUrl, note: payment.note } });
+    const sum = Number(alreadyPaid[0]?.total || 0) + payment.amount;
+    const isPaid = sum >= Number(entry.total || 0) - 0.005;
+    await Entry.updateOne({ _id: entry._id }, { $set: { paid: isPaid, paidAt: isPaid ? payment.paidAt : null, paidBy: isPaid ? req.user._id : null } });
+    res.status(201).json(payment);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.get('/api/apartments/:apartmentId/audit-log', auth, async (req, res) => {
+  try {
+    const scope = await resolveApartmentScope(req.user, req.params.apartmentId);
+    if (!scope) return res.status(403).json({ error: 'Brak dostępu do mieszkania' });
+    const logs = await AuditLog.find({ userId: scope.ownerUserId, apartmentId: scope.apartmentId }).sort({ createdAt: -1 }).limit(100).lean();
+    res.json(logs);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/apartments/:apartmentId/members', auth, async (req, res) => {
   try {
     const doc = await Setting.findOne({ userId: req.user._id });

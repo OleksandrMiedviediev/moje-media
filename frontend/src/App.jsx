@@ -8,6 +8,7 @@ import { AuthScreen, OnboardingScreen } from './components/Auth';
 import { HomeTab, entryPayload } from './components/HomeTab';
 import { HistoryTab } from './components/HistoryTab';
 import { SettingsTab } from './components/SettingsTab';
+import { FinancePanel } from './components/FinancePanel';
 
 // Миграция: старые settings → apartments[]
 const migrateSettings = s => {
@@ -263,6 +264,8 @@ export default function App() {
           />
         )}
         {tab === 'history' && (
+          <>
+          <FinancePanel apartmentId={settings.activeApartmentId} entries={sortedEntries} isOwner={!activeApartment?.shared} />
           <HistoryTab
             entries={sortedEntries}
             sortedEntries={sortedEntries}
@@ -272,6 +275,7 @@ export default function App() {
             onTogglePaid={togglePaid}
             isOwner={!activeApartment?.shared}
           />
+          </>
         )}
         {tab === 'settings' && (
           <SettingsTab
