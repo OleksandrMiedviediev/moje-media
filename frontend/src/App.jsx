@@ -159,8 +159,9 @@ export default function App() {
 
   const removeEntry = async e => {
     if (!confirm(`Usunąć ${e.month}?`)) return;
-    setEntries(entries.filter(x => x.month !== e.month));
-    if (API) try { await apiDelete(`/api/entries/${e.month}`); } catch { /* ignore */ }
+    const apartmentId = e.apartmentId || 'a1';
+    setEntries(entries.filter(x => !(x.month === e.month && (x.apartmentId || 'a1') === apartmentId)));
+    if (API) try { await apiDelete(`/api/entries/${e.month}?apartmentId=${encodeURIComponent(apartmentId)}`); } catch { /* ignore */ }
   };
 
   const saveTariff = async () => {
